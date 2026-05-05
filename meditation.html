@@ -1,0 +1,2312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Grounded</title>
+  <meta name="theme-color" content="#e04f0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Grounded">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700&family=Caveat:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── theme tokens (live here so keyframes can inherit them) ── */
+    :root {
+      --orb-a-lo:.52; --orb-a-hi:.86;
+      --orb-b-lo:.44; --orb-b-hi:.76;
+      --orb-c-lo:.36; --orb-c-hi:.70;
+      --pp-glow-lo: 0 6px 22px rgba(200,60,10,.30);
+      --pp-glow-hi: 0 12px 38px rgba(200,60,10,.52);
+    }
+    body.dark {
+      --orb-a-lo:.72; --orb-a-hi:1.0;
+      --orb-b-lo:.60; --orb-b-hi:.92;
+      --orb-c-lo:.50; --orb-c-hi:.88;
+      --pp-glow-lo: 0 8px 32px rgba(215,65,10,.45), 0 0 58px rgba(215,65,10,.15);
+      --pp-glow-hi: 0 16px 54px rgba(215,65,10,.75), 0 0 88px rgba(215,65,10,.30);
+    }
+
+    body {
+      background: #fffaf6;
+      min-height: 100dvh;
+      overflow: hidden;
+      font-family: 'Nunito', -apple-system, 'SF Pro Text', serif;
+      color: rgba(28,10,4,.84);
+      user-select: none;
+      transition: background .45s, color .45s;
+    }
+    body.dark { background: #0d0704; color: rgba(255,230,200,.88); }
+
+    /* ── orbs ─────────────────────────────────────────────────── */
+    .orb { position:fixed; border-radius:50%; pointer-events:none; }
+
+    #orb-a {
+      width:80vmax; height:80vmax;
+      background: radial-gradient(circle at 38% 40%,
+        rgba(255,100,18,.62) 0%, rgba(230,58,8,.30) 38%, transparent 65%);
+      filter: blur(62px);
+      animation: breathe-a 9s ease-in-out infinite;
+    }
+    #orb-b {
+      width:55vmax; height:55vmax;
+      background: radial-gradient(circle,
+        rgba(205,20,6,.52) 0%, rgba(248,72,18,.22) 45%, transparent 68%);
+      filter: blur(56px);
+      animation: breathe-b 13s ease-in-out infinite;
+    }
+    #orb-c {
+      width:38vmax; height:38vmax;
+      background: radial-gradient(circle,
+        rgba(255,210,100,.60) 0%, rgba(255,158,50,.22) 50%, transparent 72%);
+      filter: blur(42px);
+      animation: breathe-c 7s ease-in-out infinite;
+    }
+    body.dark #orb-a {
+      background: radial-gradient(circle at 38% 40%,
+        rgba(255,95,10,.82) 0%, rgba(230,55,5,.42) 38%, transparent 65%);
+    }
+    body.dark #orb-b {
+      background: radial-gradient(circle,
+        rgba(210,18,5,.72) 0%, rgba(250,70,15,.30) 45%, transparent 68%);
+    }
+    body.dark #orb-c {
+      background: radial-gradient(circle,
+        rgba(255,200,80,.70) 0%, rgba(255,150,40,.28) 50%, transparent 72%);
+    }
+
+    @keyframes breathe-a {
+      0%,100% { opacity:var(--orb-a-lo); transform:scale(1); }
+      50%      { opacity:var(--orb-a-hi); transform:scale(1.14); }
+    }
+    @keyframes breathe-b {
+      0%,100% { opacity:var(--orb-b-lo); transform:scale(1); }
+      50%      { opacity:var(--orb-b-hi); transform:scale(1.22); }
+    }
+    @keyframes breathe-c {
+      0%,100% { opacity:var(--orb-c-lo); transform:scale(1); }
+      50%      { opacity:var(--orb-c-hi); transform:scale(1.38); }
+    }
+
+    /* ── nav (shared base) ────────────────────────────────────── */
+    .library-btn, .theme-btn, .settings-btn {
+      position: fixed; top: 22px; z-index: 110;
+      padding: 10px 22px; border-radius: 100px;
+      font-size: 14px; font-family: inherit;
+      text-decoration: none; cursor: pointer;
+      backdrop-filter: blur(16px);
+      background: rgba(255,255,255,.65);
+      border: 1px solid rgba(200,100,40,.18);
+      color: rgba(28,10,4,.52);
+      transition: color .2s, background .2s, border-color .2s;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .library-btn { left: 24px; }
+    .theme-btn   { right: 108px; padding:0; width:42px; height:42px; font-size:18px; }
+    .settings-btn{ right: 24px; }
+
+    .library-btn:hover, .theme-btn:hover, .settings-btn:hover {
+      color: rgba(28,10,4,.82);
+      background: rgba(255,255,255,.90);
+      border-color: rgba(200,100,40,.32);
+    }
+    body.dark .library-btn,
+    body.dark .theme-btn, body.dark .settings-btn {
+      background: rgba(255,140,50,.10);
+      border-color: rgba(255,140,50,.22);
+      color: rgba(255,210,160,.65);
+    }
+    body.dark .library-btn:hover,
+    body.dark .theme-btn:hover, body.dark .settings-btn:hover {
+      background: rgba(255,140,50,.18);
+      border-color: rgba(255,140,50,.40);
+      color: rgba(255,220,180,.95);
+    }
+
+    /* ── settings panel ───────────────────────────────────────── */
+    .settings-panel {
+      position: fixed; top: 66px; right: 24px;
+      background: rgba(255,252,248,.97);
+      border: 1px solid rgba(200,100,40,.15);
+      border-radius: 20px; padding: 24px; width: 300px;
+      backdrop-filter: blur(28px); display: none; z-index: 100;
+      box-shadow: 0 16px 50px rgba(180,60,10,.12);
+      transition: background .45s, border-color .45s;
+    }
+    .settings-panel.open { display: block; }
+    body.dark .settings-panel {
+      background: rgba(18,8,3,.94);
+      border-color: rgba(255,140,50,.18);
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    }
+
+    .settings-panel h3 {
+      color: rgba(28,10,4,.48); font-size:11px; font-weight:600;
+      letter-spacing:.8px; text-transform:uppercase; margin-bottom:16px;
+    }
+    body.dark .settings-panel h3 { color: rgba(255,200,140,.48); }
+
+    .field { margin-bottom: 14px; }
+    .field label {
+      display:block; color:rgba(28,10,4,.38);
+      font-size:11px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px;
+    }
+    body.dark .field label { color: rgba(255,200,140,.36); }
+
+    .field select {
+      width:100%;
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(200,100,40,.20);
+      border-radius:12px; padding:10px 13px;
+      color: rgba(28,10,4,.80); font-size:13px; font-family:inherit;
+      outline:none; cursor:pointer; appearance:none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='rgba(28,10,4,0.3)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 12px center; padding-right:32px;
+    }
+    .field select option { background:#fff8f2; color:#1c0a04; }
+    .field select:focus  { border-color:rgba(220,90,20,.45); }
+    body.dark .field select {
+      background-color: rgba(255,140,50,.08);
+      border-color: rgba(255,140,50,.20);
+      color: rgba(255,220,170,.85);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='rgba(255,180,100,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    body.dark .field select option { background:#1a0a03; color:#ffd8a0; }
+    body.dark .field select:focus  { border-color:rgba(255,140,50,.45); }
+
+    .field textarea {
+      width: 100%;
+      background: rgba(255,255,255,.82);
+      border: 1px solid rgba(200,100,40,.20);
+      border-radius: 12px;
+      padding: 10px 13px;
+      color: rgba(28,10,4,.80);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      resize: none;
+      line-height: 1.5;
+      transition: border-color .2s;
+    }
+    .field textarea:focus { border-color: rgba(220,90,20,.45); }
+    .field textarea::placeholder { color: rgba(28,10,4,.3); }
+    body.dark .field textarea {
+      background: rgba(255,140,50,.08);
+      border-color: rgba(255,140,50,.20);
+      color: rgba(255,220,170,.85);
+    }
+    body.dark .field textarea::placeholder { color: rgba(255,180,100,.3); }
+    body.dark .field textarea:focus { border-color: rgba(255,140,50,.45); }
+
+    /* dial sliders */
+    .dial-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+    }
+    .dial-label {
+      font-size: 11px; font-weight: 700; letter-spacing: .5px;
+      text-transform: uppercase; color: rgba(28,10,4,.38);
+      width: 52px; flex-shrink: 0;
+    }
+    body.dark .dial-label { color: rgba(255,200,140,.36); }
+    .dial-ends {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: rgba(28,10,4,.28); margin-top: 3px;
+    }
+    body.dark .dial-ends { color: rgba(255,200,140,.28); }
+    .dial-wrap { flex: 1; }
+    .dial-wrap input[type=range] {
+      width: 100%; height: 4px; border-radius: 2px;
+      appearance: none; outline: none; cursor: pointer;
+      background: linear-gradient(to right,
+        rgba(210,70,15,.70) 0%,
+        rgba(210,70,15,.70) var(--pct,50%),
+        rgba(200,100,40,.18) var(--pct,50%),
+        rgba(200,100,40,.18) 100%);
+    }
+    .dial-wrap input[type=range]::-webkit-slider-thumb {
+      appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; background: rgba(210,70,15,.92);
+      box-shadow: 0 1px 6px rgba(200,60,10,.30);
+      border: 2px solid rgba(255,252,248,.95);
+    }
+    body.dark .dial-wrap input[type=range]::-webkit-slider-thumb {
+      border-color: rgba(15,8,3,.8);
+    }
+    .dial-val {
+      font-size: 11px; font-weight: 700;
+      color: rgba(210,70,15,.75); width: 28px;
+      text-align: right; flex-shrink: 0;
+    }
+
+    .personality-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-bottom: 10px;
+    }
+    .personality-chip {
+      background: rgba(255,255,255,.7);
+      border: 1px solid rgba(200,100,40,.22);
+      color: rgba(28,10,4,.55);
+      padding: 6px 13px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .personality-chip:hover,
+    .personality-chip.active {
+      background: rgba(210,70,15,.12);
+      border-color: rgba(210,70,15,.45);
+      color: rgba(210,70,15,.9);
+    }
+    body.dark .personality-chip {
+      background: rgba(255,140,50,.08);
+      border-color: rgba(255,140,50,.2);
+      color: rgba(255,200,140,.55);
+    }
+    body.dark .personality-chip:hover,
+    body.dark .personality-chip.active {
+      background: rgba(255,140,50,.18);
+      border-color: rgba(255,140,50,.5);
+      color: rgba(255,220,170,.9);
+    }
+
+    .settings-save {
+      width:100%; background:rgba(210,70,15,.92); border:none;
+      color:#fff; padding:13px; border-radius:100px;
+      font-size:14px; cursor:pointer; font-family:inherit;
+      box-shadow:0 4px 18px rgba(200,60,10,.30);
+      transition:opacity .2s, box-shadow .2s;
+    }
+    .settings-save:hover { opacity:.88; box-shadow:0 6px 26px rgba(200,60,10,.45); }
+    body.dark .settings-save {
+      background:linear-gradient(135deg, rgba(225,80,12,.96), rgba(195,45,8,.96));
+      border:1px solid rgba(255,120,40,.22);
+      box-shadow:0 4px 20px rgba(210,65,10,.45);
+    }
+
+    /* ── status ───────────────────────────────────────────────── */
+    .status {
+      position:fixed; top:50%; left:50%;
+      transform:translate(-50%,-50%);
+      text-align:center; color:rgba(28,10,4,.42);
+      font-size:15px; max-width:360px; padding:0 24px;
+      line-height:1.6; opacity:0; pointer-events:none;
+      transition:opacity .6s;
+    }
+    .status.on    { opacity:1; }
+    .status.error { color:rgba(200,40,20,.80); }
+    body.dark .status       { color:rgba(255,200,140,.55); }
+    body.dark .status.error { color:rgba(255,100,80,.85); }
+
+    .dot {
+      display:inline-block; width:6px; height:6px; border-radius:50%;
+      background:rgba(220,90,20,.75); margin-right:8px;
+      animation:pdot 1.4s ease-in-out infinite; vertical-align:middle;
+    }
+    @keyframes pdot {
+      0%,100% { opacity:.3; transform:scale(.8); }
+      50%      { opacity:1;  transform:scale(1.2); }
+    }
+
+    /* ── input area ───────────────────────────────────────────── */
+    .input-wrap {
+      position:fixed; bottom:0; left:0; right:0;
+      padding:0 24px 52px;
+      display:flex; flex-direction:column; align-items:center; gap:16px;
+      background:linear-gradient(transparent, rgba(255,250,246,.96) 48%);
+      transition:opacity .5s, background .45s;
+    }
+    .input-wrap.hidden { opacity:0; pointer-events:none; }
+    body.dark .input-wrap { background:linear-gradient(transparent, rgba(10,5,2,.96) 48%); }
+
+    .suggestions {
+      width:100%; max-width:560px;
+      display:flex; flex-wrap:wrap; gap:8px; justify-content:center;
+    }
+    .chip {
+      background:rgba(255,255,255,.65);
+      border:1px solid rgba(200,100,40,.18);
+      color:rgba(28,10,4,.52);
+      padding:8px 16px; border-radius:100px;
+      font-size:13px; font-family:inherit; cursor:pointer;
+      transition:all .2s; line-height:1.3; text-align:center;
+      backdrop-filter:blur(8px);
+    }
+    .chip:hover {
+      background:rgba(255,255,255,.90);
+      border-color:rgba(200,100,40,.35);
+      color:rgba(28,10,4,.82);
+    }
+    body.dark .chip {
+      background:rgba(255,140,50,.08); border-color:rgba(255,140,50,.22); color:rgba(255,210,155,.72);
+    }
+    body.dark .chip:hover {
+      background:rgba(255,140,50,.18); border-color:rgba(255,140,50,.42); color:rgba(255,220,175,.95);
+    }
+
+    textarea {
+      width:100%; max-width:560px;
+      background:rgba(255,255,255,.75);
+      border:1px solid rgba(200,100,40,.18);
+      border-radius:20px; padding:20px 24px;
+      color:rgba(28,10,4,.82); font-size:16px; font-family:inherit;
+      line-height:1.55; resize:none; outline:none;
+      backdrop-filter:blur(16px);
+      transition:border-color .25s, background .45s, color .45s;
+    }
+    textarea:focus { border-color:rgba(220,90,20,.45); }
+    textarea::placeholder { color:rgba(28,10,4,.28); }
+    body.dark textarea {
+      background:rgba(255,140,50,.07); border-color:rgba(255,140,50,.20); color:rgba(255,225,185,.88);
+    }
+    body.dark textarea:focus { border-color:rgba(255,140,50,.50); }
+    body.dark textarea::placeholder { color:rgba(255,180,100,.28); }
+
+    /* ── duration chips ──────────────────────────────────────── */
+    .duration-row {
+      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+      width: 100%; max-width: 560px;
+    }
+    .duration-chip {
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(200,100,40,.16);
+      color: rgba(28,10,4,.48); padding: 8px 18px;
+      border-radius: 100px; font-size: 13px; font-family: inherit;
+      cursor: pointer; transition: all .2s;
+    }
+    .duration-chip:hover {
+      background: rgba(255,255,255,.88); border-color: rgba(200,100,40,.32); color: rgba(28,10,4,.72);
+    }
+    .duration-chip.active {
+      background: rgba(210,70,15,.10); border-color: rgba(210,70,15,.42); color: rgba(210,70,15,.92);
+    }
+    body.dark .duration-chip { background: rgba(255,140,50,.07); border-color: rgba(255,140,50,.18); color: rgba(255,210,155,.58); }
+    body.dark .duration-chip:hover { background: rgba(255,140,50,.13); border-color: rgba(255,140,50,.32); color: rgba(255,210,155,.85); }
+    body.dark .duration-chip.active { background: rgba(255,140,50,.16); border-color: rgba(255,140,50,.48); color: rgba(255,200,130,.95); }
+
+    .duration-hint {
+      font-size: 12px; color: rgba(28,10,4,.25); text-align: center;
+      width: 100%; max-width: 560px; margin-top: -4px;
+    }
+    body.dark .duration-hint { color: rgba(255,200,140,.25); }
+
+    /* ── primary buttons ──────────────────────────────────────── */
+    .btn-begin, .btn-listen {
+      background:rgba(210,70,15,.92); border:none; color:#fff; border-radius:100px;
+      font-family:inherit; letter-spacing:.2px; cursor:pointer;
+      box-shadow:0 5px 24px rgba(200,60,10,.32);
+      transition:opacity .2s, box-shadow .2s, transform .15s;
+    }
+    .btn-begin  { padding:18px 56px; font-size:17px; }
+    .btn-listen { padding:17px 48px; font-size:16px; }
+    .btn-begin:hover:not(:disabled), .btn-listen:hover:not(:disabled) {
+      opacity:.88; box-shadow:0 8px 34px rgba(200,60,10,.46);
+    }
+    .btn-begin:active:not(:disabled), .btn-listen:active:not(:disabled) { transform:scale(.97); }
+    .btn-begin:disabled, .btn-listen:disabled { opacity:.30; cursor:default; }
+    body.dark .btn-begin, body.dark .btn-listen {
+      background:linear-gradient(135deg, rgba(225,80,12,.96), rgba(195,45,8,.96));
+      border:1px solid rgba(255,120,40,.22);
+      box-shadow:0 6px 32px rgba(215,65,10,.52), 0 0 0 1px rgba(255,100,30,.10);
+    }
+    body.dark .btn-begin:hover:not(:disabled), body.dark .btn-listen:hover:not(:disabled) {
+      opacity:.90; box-shadow:0 10px 44px rgba(215,65,10,.66), 0 0 0 1px rgba(255,100,30,.18);
+    }
+
+    /* ── player ───────────────────────────────────────────────── */
+    .player {
+      position:fixed; top:38%; left:50%;
+      transform:translate(-50%,-50%);
+      display:flex; flex-direction:column; align-items:center; gap:24px;
+      opacity:0; pointer-events:none; transition:opacity .6s;
+    }
+    .player.on { opacity:1; pointer-events:all; }
+
+    .player-row {
+      display:flex; align-items:center; gap:14px;
+      background:rgba(255,255,255,.70);
+      border:1px solid rgba(200,100,40,.16);
+      border-radius:100px; padding:10px 24px;
+      backdrop-filter:blur(24px);
+      box-shadow:0 6px 28px rgba(180,60,10,.10);
+      white-space:nowrap;
+      transition:background .45s, border-color .45s;
+    }
+    body.dark .player-row {
+      background:rgba(255,140,50,.08); border-color:rgba(255,140,50,.20);
+      box-shadow:0 8px 40px rgba(0,0,0,.35);
+    }
+
+    @keyframes btn-breathe {
+      0%,100% { transform:scale(1);    box-shadow:var(--pp-glow-lo); }
+      50%      { transform:scale(1.13); box-shadow:var(--pp-glow-hi); }
+    }
+
+    .btn-pp {
+      width:80px; height:80px; border-radius:50%;
+      background:rgba(210,70,15,.92); border:none;
+      color:white; font-size:26px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0;
+      transition:opacity .2s, background .45s;
+      animation:btn-breathe 4.5s ease-in-out infinite;
+    }
+    .btn-pp:hover  { opacity:.88; }
+    .btn-pp:active { animation:none; transform:scale(.93); }
+    body.dark .btn-pp {
+      background:linear-gradient(145deg, rgba(230,82,14,.96), rgba(198,46,9,.96));
+      border:1px solid rgba(255,120,40,.28);
+    }
+
+    .player-label { color:rgba(28,10,4,.42); font-size:13px; letter-spacing:.2px; }
+    body.dark .player-label { color:rgba(255,200,140,.50); }
+
+    .btn-end {
+      background:none; border:1px solid rgba(28,10,4,.12);
+      color:rgba(28,10,4,.38); padding:8px 20px; border-radius:100px;
+      font-size:12px; cursor:pointer; font-family:inherit; transition:all .2s;
+    }
+    .btn-end:hover { border-color:rgba(28,10,4,.25); color:rgba(28,10,4,.62); }
+    body.dark .btn-end { border-color:rgba(255,140,50,.18); color:rgba(255,200,140,.40); }
+    body.dark .btn-end:hover { border-color:rgba(255,140,50,.38); color:rgba(255,200,140,.75); }
+
+    audio { display:none; }
+
+    /* ── text panel ───────────────────────────────────────────── */
+    .text-panel {
+      position:fixed; inset:0;
+      display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+      padding:80px 32px 160px; overflow-y:auto;
+      opacity:0; pointer-events:none; transition:opacity .6s;
+    }
+    .text-panel.on { opacity:1; pointer-events:all; }
+
+    .text-scroll {
+      width:100%; max-width:620px;
+      background:rgba(255,255,255,.70);
+      border:1px solid rgba(200,100,40,.12);
+      border-radius:24px; padding:38px 42px;
+      backdrop-filter:blur(24px); line-height:1.95; font-size:16px;
+      color:rgba(28,10,4,.75); white-space:pre-wrap;
+      font-family:'Georgia','SF Pro Text',serif; letter-spacing:.01em;
+      box-shadow:0 8px 36px rgba(180,60,10,.08);
+      transition:background .45s, border-color .45s, color .45s;
+    }
+    body.dark .text-scroll {
+      background:rgba(255,140,50,.06); border-color:rgba(255,140,50,.14);
+      color:rgba(255,225,185,.78); box-shadow:0 12px 50px rgba(0,0,0,.35);
+    }
+    .text-chunk {
+      animation: chunk-in .55s ease-out both;
+    }
+    @keyframes chunk-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    .text-actions {
+      margin-bottom:24px; display:flex; gap:12px;
+      align-items:center; flex-wrap:wrap; justify-content:center;
+    }
+
+    /* ── secondary buttons ────────────────────────────────────── */
+    .btn-rewrite, .btn-save {
+      background:rgba(255,255,255,.62); border:1px solid rgba(28,10,4,.12);
+      color:rgba(28,10,4,.45); padding:17px 28px; border-radius:100px;
+      font-size:15px; font-family:inherit; cursor:pointer;
+      backdrop-filter:blur(12px); transition:all .2s;
+    }
+    .btn-rewrite:hover {
+      background:rgba(255,255,255,.90); border-color:rgba(28,10,4,.22); color:rgba(28,10,4,.72);
+    }
+    .btn-save { border-color:rgba(210,70,15,.28); color:rgba(210,70,15,.72); }
+    .btn-save:hover {
+      background:rgba(210,70,15,.08); border-color:rgba(210,70,15,.52); color:rgba(210,70,15,.95);
+    }
+    .btn-save:disabled { opacity:.30; cursor:default; }
+    body.dark .btn-rewrite {
+      background:rgba(255,140,50,.08); border-color:rgba(255,140,50,.20); color:rgba(255,200,140,.58);
+    }
+    body.dark .btn-rewrite:hover {
+      background:rgba(255,140,50,.14); border-color:rgba(255,140,50,.35); color:rgba(255,210,160,.85);
+    }
+    body.dark .btn-save {
+      background:rgba(255,140,50,.08); border-color:rgba(225,80,12,.30); color:rgba(255,160,80,.72);
+    }
+    body.dark .btn-save:hover {
+      background:rgba(225,80,12,.14); border-color:rgba(225,80,12,.55); color:rgba(255,180,100,.95);
+    }
+
+    /* ── library ──────────────────────────────────────────────── */
+    .library-overlay {
+      position:fixed; inset:0;
+      background:rgba(255,250,246,.97); backdrop-filter:blur(28px);
+      z-index:200; display:flex; flex-direction:column;
+      opacity:0; pointer-events:none;
+      transition:opacity .4s, background .45s;
+    }
+    .library-overlay.on { opacity:1; pointer-events:all; }
+    body.dark .library-overlay { background:rgba(10,5,2,.97); }
+
+    .library-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:28px 32px 20px;
+      border-bottom:1px solid rgba(200,100,40,.10); flex-shrink:0;
+      transition:border-color .45s;
+    }
+    body.dark .library-header { border-color:rgba(255,140,50,.10); }
+
+    .library-header h2 {
+      font-size:20px; font-weight:600; color:rgba(28,10,4,.80); letter-spacing:-.3px;
+      transition:color .45s;
+    }
+    body.dark .library-header h2 { color:rgba(255,220,175,.85); }
+
+    .library-close {
+      background:rgba(255,255,255,.62); border:1px solid rgba(28,10,4,.12);
+      color:rgba(28,10,4,.40); width:38px; height:38px; border-radius:50%;
+      font-size:16px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; transition:all .2s;
+    }
+    .library-close:hover { background:rgba(255,255,255,.90); color:rgba(28,10,4,.70); }
+    body.dark .library-close {
+      background:rgba(255,140,50,.08); border-color:rgba(255,140,50,.18); color:rgba(255,200,140,.45);
+    }
+    body.dark .library-close:hover { background:rgba(255,140,50,.15); color:rgba(255,210,160,.80); }
+
+    .library-list {
+      flex:1; overflow-y:auto; padding:24px 32px 40px;
+      display:flex; flex-direction:column; gap:14px;
+    }
+
+    .library-empty {
+      text-align:center; font-size:15px; margin-top:60px;
+      line-height:1.8; color:rgba(28,10,4,.28); transition:color .45s;
+    }
+    body.dark .library-empty { color:rgba(255,200,140,.28); }
+
+    .med-card {
+      background:rgba(255,255,255,.72); border:1px solid rgba(200,100,40,.12);
+      border-radius:18px; padding:20px 22px;
+      display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+      transition:background .2s, border-color .2s;
+    }
+    .med-card:hover { background:rgba(255,255,255,.92); border-color:rgba(200,100,40,.22); }
+    body.dark .med-card { background:rgba(255,140,50,.06); border-color:rgba(255,140,50,.13); }
+    body.dark .med-card:hover { background:rgba(255,140,50,.10); border-color:rgba(255,140,50,.22); }
+
+    .med-card-body { flex:1; min-width:0; }
+    .med-card-title {
+      font-size:15px; font-weight:600; color:rgba(28,10,4,.80); margin-bottom:4px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:color .45s;
+    }
+    body.dark .med-card-title { color:rgba(255,220,170,.85); }
+    .med-card-date { font-size:12px; color:rgba(28,10,4,.32); transition:color .45s; }
+    body.dark .med-card-date { color:rgba(255,190,110,.35); }
+    .med-card-preview {
+      font-size:13px; color:rgba(28,10,4,.42); margin-top:8px; line-height:1.5;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+      transition:color .45s;
+    }
+    body.dark .med-card-preview { color:rgba(255,200,140,.45); }
+
+    .med-card-actions { display:flex; gap:8px; flex-shrink:0; align-items:center; }
+    .btn-card-play {
+      background:rgba(210,70,15,.88); border:none; color:#fff;
+      padding:9px 20px; border-radius:100px; font-size:13px; cursor:pointer;
+      font-family:inherit; white-space:nowrap;
+      box-shadow:0 4px 14px rgba(200,60,10,.28); transition:opacity .2s;
+    }
+    .btn-card-play:hover { opacity:.85; }
+    body.dark .btn-card-play {
+      background:linear-gradient(135deg, rgba(220,76,12,.90), rgba(190,42,8,.90));
+      border:1px solid rgba(255,110,30,.18); box-shadow:0 4px 16px rgba(210,60,10,.40);
+    }
+    .btn-card-view {
+      background:none; border:1px solid rgba(28,10,4,.14);
+      color:rgba(28,10,4,.42); padding:9px 16px; border-radius:100px;
+      font-size:13px; cursor:pointer; font-family:inherit; white-space:nowrap;
+      transition:all .2s;
+    }
+    .btn-card-view:hover { border-color:rgba(28,10,4,.26); color:rgba(28,10,4,.70); }
+    body.dark .btn-card-view { border-color:rgba(255,140,50,.20); color:rgba(255,200,140,.42); }
+    body.dark .btn-card-view:hover { border-color:rgba(255,140,50,.40); color:rgba(255,200,140,.78); }
+    .btn-card-del {
+      background:rgba(255,255,255,.55); border:1px solid rgba(28,10,4,.10);
+      color:rgba(28,10,4,.28); width:36px; height:36px; border-radius:50%;
+      font-size:14px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; transition:all .2s;
+    }
+    .btn-card-del:hover { border-color:rgba(200,40,20,.30); color:rgba(200,40,20,.70); }
+    body.dark .btn-card-del {
+      background:rgba(255,140,50,.06); border-color:rgba(255,140,50,.14); color:rgba(255,180,100,.30);
+    }
+    body.dark .btn-card-del:hover { border-color:rgba(255,80,60,.35); color:rgba(255,100,80,.75); }
+
+    /* ── FOLDERS ──────────────────────────────────────────────── */
+    .folder-bar {
+      padding: 12px 32px 16px;
+      display: flex; align-items: center; gap: 8px;
+      overflow-x: auto; flex-shrink: 0;
+      border-bottom: 1px solid rgba(200,100,40,.08);
+      scrollbar-width: none;
+    }
+    .folder-bar::-webkit-scrollbar { display: none; }
+    body.dark .folder-bar { border-color: rgba(255,140,50,.08); }
+
+    .folder-chip {
+      background: rgba(255,255,255,.72); border: 1px solid rgba(200,100,40,.14);
+      border-radius: 100px; padding: 7px 16px;
+      font-size: 13px; font-family: inherit; color: rgba(28,10,4,.52);
+      cursor: pointer; flex-shrink: 0; transition: all .2s; white-space: nowrap;
+    }
+    .folder-chip.active {
+      background: rgba(210,70,15,.10); border-color: rgba(210,70,15,.35); color: rgba(210,70,15,.90);
+    }
+    .folder-chip:hover:not(.active) {
+      background: rgba(255,255,255,.92); border-color: rgba(200,100,40,.28); color: rgba(28,10,4,.72);
+    }
+    body.dark .folder-chip { background: rgba(255,140,50,.07); border-color: rgba(255,140,50,.16); color: rgba(255,210,155,.65); }
+    body.dark .folder-chip.active { background: rgba(255,140,50,.15); border-color: rgba(255,140,50,.40); color: rgba(255,200,130,.92); }
+    body.dark .folder-chip:hover:not(.active) { background: rgba(255,140,50,.11); border-color: rgba(255,140,50,.26); color: rgba(255,210,155,.85); }
+
+    .folder-chip-wrap {
+      display: flex; align-items: center; gap: 0;
+      background: rgba(255,255,255,.72); border: 1px solid rgba(200,100,40,.14);
+      border-radius: 100px; overflow: hidden; flex-shrink: 0; transition: all .2s;
+    }
+    .folder-chip-wrap:has(.folder-chip.active) {
+      background: rgba(210,70,15,.10); border-color: rgba(210,70,15,.35);
+    }
+    body.dark .folder-chip-wrap { background: rgba(255,140,50,.07); border-color: rgba(255,140,50,.16); }
+    body.dark .folder-chip-wrap:has(.folder-chip.active) { background: rgba(255,140,50,.15); border-color: rgba(255,140,50,.40); }
+    .folder-chip-wrap .folder-chip {
+      border: none; border-radius: 0; padding: 7px 10px 7px 16px; background: none;
+    }
+    .folder-chip-del {
+      background: none; border: none; color: rgba(28,10,4,.25);
+      font-size: 10px; padding: 7px 11px 7px 4px;
+      cursor: pointer; font-family: inherit; transition: color .2s; flex-shrink: 0;
+    }
+    .folder-chip-del:hover { color: rgba(200,40,20,.70); }
+    body.dark .folder-chip-del { color: rgba(255,180,100,.25); }
+    body.dark .folder-chip-del:hover { color: rgba(255,90,70,.75); }
+
+    .folder-add-btn {
+      background: none; border: 1px dashed rgba(200,100,40,.25);
+      color: rgba(28,10,4,.35); padding: 7px 14px;
+      border-radius: 100px; font-size: 12px; font-family: inherit;
+      cursor: pointer; flex-shrink: 0; transition: all .2s; white-space: nowrap;
+    }
+    .folder-add-btn:hover {
+      border-color: rgba(210,70,15,.45); color: rgba(210,70,15,.75); background: rgba(210,70,15,.05);
+    }
+    body.dark .folder-add-btn { border-color: rgba(255,140,50,.22); color: rgba(255,200,140,.35); }
+    body.dark .folder-add-btn:hover { border-color: rgba(255,140,50,.50); color: rgba(255,190,110,.75); background: rgba(255,140,50,.06); }
+
+    .folder-chip.drag-over {
+      background: rgba(210,70,15,.22) !important;
+      border-color: rgba(210,70,15,.60) !important;
+      color: rgba(210,70,15,.95) !important;
+      transform: scale(1.06);
+    }
+    .folder-chip-wrap.drag-over {
+      background: rgba(210,70,15,.22) !important;
+      border-color: rgba(210,70,15,.60) !important;
+      transform: scale(1.06);
+    }
+    .med-card[draggable="true"] { cursor: grab; }
+    .med-card[draggable="true"]:active { cursor: grabbing; }
+
+    .folder-create-wrap { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .folder-create-input {
+      background: rgba(255,255,255,.88); border: 1px solid rgba(210,70,15,.40);
+      border-radius: 100px; padding: 6px 14px;
+      font-size: 13px; font-family: inherit; color: rgba(28,10,4,.80);
+      outline: none; width: 130px; transition: border-color .2s;
+    }
+    .folder-create-input:focus { border-color: rgba(210,70,15,.65); }
+    body.dark .folder-create-input {
+      background: rgba(255,140,50,.10); border-color: rgba(255,140,50,.42); color: rgba(255,225,185,.88);
+    }
+    .folder-create-ok, .folder-create-cancel {
+      background: none; border: none; font-size: 14px; cursor: pointer;
+      padding: 4px 6px; border-radius: 50%; transition: color .2s; font-family: inherit;
+    }
+    .folder-create-ok { color: rgba(210,70,15,.75); }
+    .folder-create-ok:hover { color: rgba(210,70,15,1); }
+    .folder-create-cancel { color: rgba(28,10,4,.30); }
+    .folder-create-cancel:hover { color: rgba(200,40,20,.70); }
+
+    .med-card-folder-badge {
+      display: inline-block; font-size: 10px;
+      color: rgba(210,70,15,.65); background: rgba(210,70,15,.08);
+      border: 1px solid rgba(210,70,15,.18); border-radius: 100px;
+      padding: 2px 8px; margin-top: 4px;
+    }
+    body.dark .med-card-folder-badge {
+      color: rgba(255,180,90,.65); background: rgba(255,140,50,.10); border-color: rgba(255,140,50,.22);
+    }
+
+    .btn-card-folder {
+      background: rgba(255,255,255,.55); border: 1px solid rgba(28,10,4,.10);
+      color: rgba(28,10,4,.30); width: 36px; height: 36px; border-radius: 50%;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .2s;
+    }
+    .btn-card-folder:hover {
+      border-color: rgba(210,70,15,.35); color: rgba(210,70,15,.72); background: rgba(210,70,15,.06);
+    }
+    body.dark .btn-card-folder {
+      background: rgba(255,140,50,.06); border-color: rgba(255,140,50,.14); color: rgba(255,180,100,.30);
+    }
+    body.dark .btn-card-folder:hover {
+      border-color: rgba(255,140,50,.38); color: rgba(255,180,90,.72); background: rgba(255,140,50,.10);
+    }
+
+    .folder-picker-modal {
+      position: fixed; inset: 0; z-index: 950;
+      background: rgba(10,5,2,.40); backdrop-filter: blur(6px);
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 24px;
+      opacity: 0; pointer-events: none; transition: opacity .3s;
+    }
+    .folder-picker-modal.on { opacity: 1; pointer-events: all; }
+    .folder-picker-card {
+      background: #fef8ee; border-radius: 20px 20px 16px 16px;
+      padding: 24px 22px 20px; width: 100%; max-width: 420px;
+      box-shadow: 0 -4px 28px rgba(180,80,10,.12), 0 20px 60px rgba(0,0,0,.18);
+    }
+    body.dark .folder-picker-card { background: #1c0e06; }
+    .folder-picker-card h3 {
+      font-size: 16px; font-weight: 700; color: rgba(30,12,4,.80); margin-bottom: 14px;
+    }
+    body.dark .folder-picker-card h3 { color: rgba(255,230,195,.85); }
+    .folder-picker-options { display: flex; flex-direction: column; gap: 8px; }
+    .folder-option {
+      background: rgba(255,255,255,.65); border: 1px solid rgba(200,100,40,.15);
+      border-radius: 12px; padding: 11px 16px;
+      font-size: 14px; font-family: inherit; color: rgba(28,10,4,.65);
+      cursor: pointer; text-align: left; transition: all .2s;
+    }
+    .folder-option:hover { background: rgba(255,255,255,.92); border-color: rgba(200,100,40,.28); color: rgba(28,10,4,.85); }
+    .folder-option.active { background: rgba(210,70,15,.09); border-color: rgba(210,70,15,.38); color: rgba(210,70,15,.90); }
+    body.dark .folder-option { background: rgba(255,140,50,.07); border-color: rgba(255,140,50,.16); color: rgba(255,210,155,.65); }
+    body.dark .folder-option:hover { background: rgba(255,140,50,.12); border-color: rgba(255,140,50,.30); color: rgba(255,220,175,.88); }
+    body.dark .folder-option.active { background: rgba(255,140,50,.16); border-color: rgba(255,140,50,.42); color: rgba(255,200,130,.92); }
+    .folder-picker-cancel {
+      width: 100%; background: none; border: 1px solid rgba(30,12,4,.12);
+      color: rgba(30,12,4,.40); padding: 11px;
+      border-radius: 100px; font-size: 13px; font-family: inherit; cursor: pointer;
+      margin-top: 12px; transition: all .2s;
+    }
+    .folder-picker-cancel:hover { border-color: rgba(30,12,4,.25); color: rgba(30,12,4,.70); }
+    body.dark .folder-picker-cancel { border-color: rgba(255,215,175,.15); color: rgba(255,215,175,.40); }
+    body.dark .folder-picker-cancel:hover { border-color: rgba(255,215,175,.32); color: rgba(255,215,175,.72); }
+    /* ── INTRO OVERLAY ──────────────────────────────────────── */
+    .intro-overlay {
+      position: fixed; inset: 0; z-index: 999;
+      background: rgba(255,250,246,.55);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 20px 24px 36px;
+      gap: 0;
+      transition: opacity .5s;
+    }
+    .intro-overlay.out  { opacity: 0; pointer-events: none; }
+    .intro-overlay.gone { display: none; }
+    body.dark .intro-overlay {
+      background: rgba(6,9,18,.55);
+    }
+
+    /* Waldow — flame energy */
+    .barry-wrap {
+      display: flex; justify-content: center;
+      margin-bottom: 10px;
+      filter: drop-shadow(0 8px 24px rgba(220,140,60,.16));
+      animation: flame-sway 6s ease-in-out infinite;
+    }
+    @keyframes flame-sway {
+      0%,100% { transform: translateY(0)   rotate(-.5deg) scaleX(1);    }
+      40%      { transform: translateY(-5px) rotate(.8deg)  scaleX(.98); }
+      70%      { transform: translateY(-3px) rotate(-.3deg) scaleX(1.01); }
+    }
+
+    /* paper card — matches app glass style */
+    .paper {
+      width: 100%; max-width: 380px;
+      background: rgba(255,252,248,.92);
+      border: 1px solid rgba(200,100,40,.14);
+      border-radius: 22px;
+      padding: 32px 28px 26px;
+      position: relative;
+      backdrop-filter: blur(24px);
+      box-shadow:
+        0 4px 20px rgba(180,80,10,.10),
+        0 16px 48px rgba(180,80,10,.10);
+    }
+    body.dark .paper {
+      background: rgba(16,8,3,.90);
+      border-color: rgba(255,140,50,.16);
+      box-shadow: 0 8px 40px rgba(0,0,0,.4);
+    }
+
+    .slide { display: none; }
+    .slide.active { display: block; }
+
+    .slide-tag {
+      font-size: 11px; font-weight: 700; letter-spacing: .9px;
+      text-transform: uppercase; color: rgba(210,90,20,.5);
+      margin-bottom: 8px;
+    }
+    body.dark .slide-tag { color: rgba(255,150,60,.45); }
+    .slide-title {
+      font-size: 21px; font-weight: 700; line-height: 1.25;
+      color: rgba(28,10,4,.84); margin-bottom: 12px;
+    }
+    body.dark .slide-title { color: rgba(255,230,200,.88); }
+    .slide-body {
+      font-size: 14.5px; line-height: 1.78;
+      color: rgba(28,10,4,.58);
+    }
+    body.dark .slide-body { color: rgba(255,220,185,.58); }
+    .slide-body ul { list-style: none; padding: 0; margin: 10px 0; }
+    .slide-body ul li { padding: 4px 0 4px 18px; position: relative; font-size: 13.5px; }
+    .slide-body ul li::before {
+      content: '✦'; position: absolute; left: 0;
+      color: rgba(210,90,20,.4); font-size: 9px; top: 8px;
+    }
+    .hl      { background: rgba(255,200,60,.30); padding: 1px 5px; border-radius: 4px; }
+    .hl-pink { background: rgba(255,150,120,.25); padding: 1px 5px; border-radius: 4px; }
+
+    /* dots + nav */
+    .intro-dots {
+      display: flex; gap: 6px; margin-top: 18px; justify-content: center;
+    }
+    .intro-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: rgba(200,90,20,.18); transition: all .3s;
+    }
+    .intro-dot.active { background: rgba(200,90,20,.70); transform: scale(1.3); }
+
+    .intro-nav {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-top: 16px; width: 100%; max-width: 380px;
+    }
+    .btn-skip {
+      background: none; border: none; font-family: inherit;
+      font-size: 13px; color: rgba(30,12,4,.28); cursor: pointer; padding: 8px 2px;
+    }
+    body.dark .btn-skip { color: rgba(255,215,175,.28); }
+    .btn-skip:hover { color: rgba(30,12,4,.55); }
+    .btn-back {
+      background: none; border: 1px solid rgba(30,12,4,.14);
+      color: rgba(30,12,4,.45); padding: 10px 18px;
+      border-radius: 100px; font-size: 13px; font-family: inherit;
+      cursor: pointer; transition: all .2s;
+    }
+    body.dark .btn-back { border-color: rgba(255,215,175,.16); color: rgba(255,215,175,.4); }
+    .btn-back:hover { border-color: rgba(30,12,4,.28); color: rgba(30,12,4,.75); }
+    body.dark .btn-back:hover { border-color: rgba(255,215,175,.35); color: rgba(255,215,175,.75); }
+
+    .btn-next {
+      background: rgba(210,70,15,.90); border: none; color: #fff;
+      padding: 12px 26px; border-radius: 100px;
+      font-size: 14px; font-family: inherit; font-weight: 700;
+      cursor: pointer; box-shadow: 0 4px 18px rgba(200,60,10,.30);
+      transition: all .2s;
+    }
+    .btn-next:hover { opacity: .88; box-shadow: 0 6px 24px rgba(200,60,10,.45); }
+
+    /* ── FEEDBACK BUTTON ─────────────────────────────────────── */
+    .feedback-fab {
+      position: fixed; left: 18px; bottom: 22px; z-index: 80;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      cursor: pointer;
+    }
+    .feedback-fab:hover .feedback-label { opacity: 1; transform: translateY(0); }
+    .barry-mini {
+      filter: drop-shadow(0 2px 6px rgba(100,50,10,.20));
+      transition: transform .2s;
+    }
+    .feedback-fab:hover .barry-mini { transform: translateY(-3px); }
+    .feedback-label {
+      background: rgba(210,70,15,.88); color: #fff;
+      font-size: 11px; font-weight: 700; letter-spacing: .4px;
+      padding: 5px 12px; border-radius: 100px;
+      box-shadow: 0 3px 12px rgba(200,60,10,.28);
+      opacity: .7; transform: translateY(2px);
+      transition: all .2s; white-space: nowrap;
+    }
+
+    /* ── FEEDBACK MODAL ──────────────────────────────────────── */
+    .feedback-modal {
+      position: fixed; inset: 0; z-index: 900;
+      background: rgba(10,5,2,.45);
+      backdrop-filter: blur(8px);
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 24px;
+      opacity: 0; pointer-events: none;
+      transition: opacity .3s;
+    }
+    .feedback-modal.on { opacity: 1; pointer-events: all; }
+    .feedback-card {
+      background: #fef8ee;
+      border-radius: 20px 20px 16px 16px;
+      padding: 28px 24px 24px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 -4px 30px rgba(180,80,10,.12), 0 20px 60px rgba(0,0,0,.2);
+      position: relative;
+    }
+    body.dark .feedback-card { background: #1c0e06; }
+    .feedback-card h3 {
+      font-size: 18px; font-weight: 700; color: rgba(30,12,4,.88); margin-bottom: 4px;
+    }
+    body.dark .feedback-card h3 { color: rgba(255,230,195,.9); }
+    .feedback-card p {
+      font-size: 13px; color: rgba(30,12,4,.45); margin-bottom: 16px;
+    }
+    body.dark .feedback-card p { color: rgba(255,215,175,.45); }
+    .feedback-card textarea {
+      width: 100%; background: rgba(255,255,255,.7);
+      border: 1px solid rgba(200,100,40,.18);
+      border-radius: 12px; padding: 14px 16px;
+      font-size: 14px; font-family: inherit; line-height: 1.55;
+      color: rgba(30,12,4,.82); resize: none; outline: none;
+      transition: border-color .2s;
+    }
+    body.dark .feedback-card textarea {
+      background: rgba(255,140,50,.07);
+      border-color: rgba(255,140,50,.18);
+      color: rgba(255,220,175,.85);
+    }
+    .feedback-card textarea:focus { border-color: rgba(210,70,15,.45); }
+    .feedback-actions {
+      display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end;
+    }
+    .btn-fb-cancel {
+      background: none; border: 1px solid rgba(30,12,4,.12);
+      color: rgba(30,12,4,.4); padding: 10px 20px;
+      border-radius: 100px; font-size: 13px; font-family: inherit; cursor: pointer;
+      transition: all .2s;
+    }
+    body.dark .btn-fb-cancel { border-color: rgba(255,215,175,.15); color: rgba(255,215,175,.4); }
+    .btn-fb-cancel:hover { border-color: rgba(30,12,4,.25); color: rgba(30,12,4,.7); }
+    .btn-fb-send {
+      background: rgba(210,70,15,.9); border: none; color: #fff;
+      padding: 10px 22px; border-radius: 100px;
+      font-size: 13px; font-family: inherit; font-weight: 700; cursor: pointer;
+      box-shadow: 0 3px 14px rgba(200,60,10,.28); transition: all .2s;
+    }
+    .btn-fb-send:hover { opacity: .88; }
+
+    /* ── PERSONALITY BUBBLES ────────────────────────────────────── */
+    .personality-bubbles { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
+    .personality-bubble {
+      display: inline-flex; align-items: center;
+      background: rgba(255,255,255,.70); border: 1px solid rgba(200,100,40,.22);
+      color: rgba(28,10,4,.55); border-radius: 100px;
+      font-size: 12px; font-family: inherit; cursor: pointer; transition: all .2s; overflow: hidden;
+    }
+    .personality-bubble:hover { background: rgba(255,255,255,.90); border-color: rgba(200,100,40,.38); }
+    .personality-bubble.active { background: rgba(210,70,15,.12); border-color: rgba(210,70,15,.45); color: rgba(210,70,15,.9); }
+    .bubble-label { padding: 6px 8px 6px 13px; }
+    .btn-edit-personality {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(200,100,40,.10); border: none; cursor: pointer;
+      margin: 3px 3px 3px 0; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: rgba(28,10,4,.35); transition: all .2s; flex-shrink: 0;
+    }
+    .btn-edit-personality:hover { background: rgba(210,70,15,.18); color: rgba(210,70,15,.80); }
+    body.dark .personality-bubble { background: rgba(255,140,50,.08); border-color: rgba(255,140,50,.20); color: rgba(255,200,140,.55); }
+    body.dark .personality-bubble:hover { background: rgba(255,140,50,.14); border-color: rgba(255,140,50,.35); }
+    body.dark .personality-bubble.active { background: rgba(255,140,50,.18); border-color: rgba(255,140,50,.50); color: rgba(255,220,170,.90); }
+    body.dark .btn-edit-personality { background: rgba(255,140,50,.10); color: rgba(255,200,140,.35); }
+    body.dark .btn-edit-personality:hover { background: rgba(255,140,50,.22); color: rgba(255,180,80,.80); }
+    .btn-add-personality {
+      background: none; border: 1px dashed rgba(200,100,40,.30);
+      color: rgba(28,10,4,.38); padding: 6px 13px; border-radius: 100px;
+      font-size: 12px; font-family: inherit; cursor: pointer; transition: all .2s;
+    }
+    .btn-add-personality:hover { border-color: rgba(210,70,15,.45); color: rgba(210,70,15,.75); background: rgba(210,70,15,.06); }
+    body.dark .btn-add-personality { border-color: rgba(255,140,50,.25); color: rgba(255,200,140,.38); }
+    body.dark .btn-add-personality:hover { border-color: rgba(255,140,50,.50); color: rgba(255,180,80,.80); background: rgba(255,140,50,.08); }
+
+    /* ── PERSONALITY MODAL ───────────────────────────────────────── */
+    .personality-modal {
+      position: fixed; inset: 0; z-index: 150;
+      background: rgba(10,5,2,.35); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; opacity: 0; pointer-events: none; transition: opacity .25s;
+    }
+    .personality-modal.on { opacity: 1; pointer-events: all; }
+    .personality-modal-card {
+      background: rgba(255,252,248,.98); border: 1px solid rgba(200,100,40,.14);
+      border-radius: 22px; padding: 28px 24px 22px; width: 100%; max-width: 360px;
+      box-shadow: 0 16px 50px rgba(180,60,10,.14);
+    }
+    body.dark .personality-modal-card { background: rgba(18,8,3,.97); border-color: rgba(255,140,50,.18); box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+    .personality-modal-card h3 { font-size: 15px; font-weight: 700; color: rgba(28,10,4,.80); margin-bottom: 18px; }
+    body.dark .personality-modal-card h3 { color: rgba(255,220,175,.85); }
+    .pm-field { margin-bottom: 12px; }
+    .pm-field label { display: block; color: rgba(28,10,4,.38); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    body.dark .pm-field label { color: rgba(255,200,140,.36); }
+    .pm-input {
+      width: 100%; background: rgba(255,255,255,.82); border: 1px solid rgba(200,100,40,.20);
+      border-radius: 12px; padding: 10px 13px; color: rgba(28,10,4,.80);
+      font-size: 13px; font-family: inherit; outline: none; transition: border-color .2s; resize: none; line-height: 1.5;
+    }
+    .pm-input:focus { border-color: rgba(220,90,20,.45); }
+    .pm-input::placeholder { color: rgba(28,10,4,.28); }
+    body.dark .pm-input { background: rgba(255,140,50,.08); border-color: rgba(255,140,50,.20); color: rgba(255,220,170,.85); }
+    body.dark .pm-input:focus { border-color: rgba(255,140,50,.45); }
+    body.dark .pm-input::placeholder { color: rgba(255,180,100,.28); }
+    .personality-modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+    .btn-pm-delete { background: none; border: none; color: rgba(200,40,20,.55); font-size: 13px; font-family: inherit; cursor: pointer; padding: 0; transition: color .2s; }
+    .btn-pm-delete:hover { color: rgba(200,40,20,.88); }
+    .btn-pm-delete:disabled { opacity: 0; pointer-events: none; }
+    .btn-pm-cancel { background: none; border: 1px solid rgba(28,10,4,.14); color: rgba(28,10,4,.45); padding: 10px 18px; border-radius: 100px; font-size: 13px; font-family: inherit; cursor: pointer; transition: all .2s; }
+    .btn-pm-cancel:hover { border-color: rgba(28,10,4,.28); color: rgba(28,10,4,.72); }
+    body.dark .btn-pm-cancel { border-color: rgba(255,215,175,.15); color: rgba(255,215,175,.45); }
+    .btn-pm-save { background: rgba(210,70,15,.90); border: none; color: #fff; padding: 10px 22px; border-radius: 100px; font-size: 13px; font-family: inherit; font-weight: 700; cursor: pointer; box-shadow: 0 3px 14px rgba(200,60,10,.28); transition: all .2s; }
+    .btn-pm-save:hover { opacity: .88; }
+
+    /* ── DELETE CONFIRM MODAL ────────────────────────────────────── */
+    .delete-modal {
+      position: fixed; inset: 0; z-index: 900;
+      background: rgba(10,5,2,.45);
+      backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      opacity: 0; pointer-events: none;
+      transition: opacity .3s;
+    }
+    .delete-modal.on { opacity: 1; pointer-events: all; }
+    .delete-card {
+      background: #fef8ee;
+      border-radius: 24px;
+      padding: 32px 28px 26px;
+      width: 100%; max-width: 340px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center;
+    }
+    body.dark .delete-card { background: #1c0e06; }
+    .delete-waldow {
+      margin-bottom: 14px;
+      filter: drop-shadow(0 6px 16px rgba(220,100,20,.28));
+      animation: curious-tilt 3s ease-in-out infinite;
+    }
+    @keyframes curious-tilt {
+      0%,100% { transform: rotate(-5deg) translateY(0); }
+      45%      { transform: rotate(5deg)  translateY(-5px); }
+      75%      { transform: rotate(-2deg) translateY(-3px); }
+    }
+    .delete-card h3 {
+      font-size: 18px; font-weight: 700; color: rgba(30,12,4,.88); margin-bottom: 6px;
+    }
+    body.dark .delete-card h3 { color: rgba(255,230,195,.9); }
+    .delete-card p {
+      font-size: 13px; color: rgba(30,12,4,.45); margin-bottom: 20px; line-height: 1.5;
+    }
+    body.dark .delete-card p { color: rgba(255,215,175,.45); }
+    .delete-actions { display: flex; gap: 10px; width: 100%; }
+    .btn-del-cancel {
+      flex: 1; background: none; border: 1px solid rgba(30,12,4,.14);
+      color: rgba(30,12,4,.45); padding: 12px;
+      border-radius: 100px; font-size: 14px; font-family: inherit; cursor: pointer;
+      transition: all .2s;
+    }
+    body.dark .btn-del-cancel { border-color: rgba(255,215,175,.15); color: rgba(255,215,175,.45); }
+    .btn-del-cancel:hover { border-color: rgba(30,12,4,.28); color: rgba(30,12,4,.72); }
+    .btn-del-confirm {
+      flex: 1; background: rgba(200,40,20,.88); border: none; color: #fff;
+      padding: 12px; border-radius: 100px;
+      font-size: 14px; font-family: inherit; font-weight: 700; cursor: pointer;
+      box-shadow: 0 3px 14px rgba(180,30,10,.28); transition: all .2s;
+    }
+    .btn-del-confirm:hover { opacity: .88; }
+
+  </style>
+</head>
+<body>
+
+  <!-- ── INTRO ───────────────────────────────────────────────── -->
+  <div class="intro-overlay" id="intro">
+
+    <!-- Waldow — soft flame energy -->
+    <div class="barry-wrap">
+      <svg width="80" height="120" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="fg-outer" cx="50%" cy="70%" r="55%">
+            <stop offset="0%"   stop-color="rgba(255,195,90,.16)"/>
+            <stop offset="100%" stop-color="rgba(220,130,40,0)"/>
+          </radialGradient>
+          <radialGradient id="fg-body" cx="48%" cy="62%" r="52%">
+            <stop offset="0%"   stop-color="rgba(255,248,225,1)"/>
+            <stop offset="25%"  stop-color="rgba(255,210,110,.88)"/>
+            <stop offset="58%"  stop-color="rgba(240,145,55,.75)"/>
+            <stop offset="100%" stop-color="rgba(210,95,35,.58)"/>
+          </radialGradient>
+          <radialGradient id="fg-inner" cx="44%" cy="55%" r="38%">
+            <stop offset="0%"   stop-color="rgba(255,255,240,.85)"/>
+            <stop offset="100%" stop-color="rgba(255,215,100,0)"/>
+          </radialGradient>
+          <filter id="fg-blur" x="-25%" y="-25%" width="150%" height="150%">
+            <feGaussianBlur stdDeviation="4.5"/>
+          </filter>
+        </defs>
+        <!-- outer haze -->
+        <ellipse cx="40" cy="80" rx="38" ry="34" fill="url(#fg-outer)"/>
+        <!-- soft glow behind flame -->
+        <ellipse cx="40" cy="72" rx="30" ry="38" fill="rgba(255,190,90,.10)" filter="url(#fg-blur)"/>
+        <!-- main flame body — teardrop tapering to a soft tip -->
+        <path d="M40 6 C 52 28, 62 50, 60 75 C 58 98, 22 98, 20 75 C 18 50, 28 28, 40 6 Z"
+              fill="url(#fg-body)"/>
+        <!-- inner highlight -->
+        <path d="M40 22 C 47 38, 52 55, 50 72 C 48 88, 32 88, 30 72 C 28 55, 33 38, 40 22 Z"
+              fill="url(#fg-inner)" opacity=".6"/>
+        <!-- tiny subtle smile near base -->
+        <path d="M32 82 Q40 90 48 82" stroke="rgba(160,70,10,.28)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <!-- Paper card -->
+    <div class="paper">
+
+      <div class="slide active" id="slide-0">
+        <div class="slide-tag">welcome</div>
+        <div class="slide-title">A little corner of calm</div>
+        <div class="slide-body">
+          This app was made by someone who <span class="hl">really loves being grounded</span> — and wanted to share that with the world, one breath at a time.<br><br>
+          Every meditation is written just for you, in the moment, for exactly what you need.
+        </div>
+      </div>
+
+      <div class="slide" id="slide-1">
+        <div class="slide-tag">how to use it</div>
+        <div class="slide-title">Just describe what you need</div>
+        <div class="slide-body">
+          Be as specific as you like, for example:
+          <ul>
+            <li>help me breathe before a difficult conversation</li>
+            <li>I can't stop overthinking — help me slow down</li>
+            <li>help me feel grateful for something small today</li>
+          </ul>
+          A calm voice will read it to you, slowly.
+        </div>
+      </div>
+
+      <div class="slide" id="slide-2">
+        <div class="slide-tag">one last thing</div>
+        <div class="slide-title">We're growing together</div>
+        <div class="slide-body">
+          This is our designer's <span class="hl-pink">very first app</span> and they are so excited to be building something meaningful.<br><br>
+          If anything could be better, Waldow is always at the bottom of the screen — ready to hear from you.
+        </div>
+      </div>
+
+    </div>
+
+    <div class="intro-dots">
+      <div class="intro-dot active"></div>
+      <div class="intro-dot"></div>
+      <div class="intro-dot"></div>
+    </div>
+
+    <div class="intro-nav">
+      <button class="btn-skip" id="introSkipBtn" onclick="finishIntro()">Skip</button>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button class="btn-back" id="introBackBtn" onclick="introBack()" style="display:none">← Back</button>
+        <button class="btn-next" id="introNextBtn" onclick="introNext()">Next →</button>
+      </div>
+    </div>
+
+  </div>
+  <!-- ── /INTRO ──────────────────────────────────────────────── -->
+
+  <!-- ── FEEDBACK BUTTON (Barry lives here) ──────────────────── -->
+  <div class="feedback-fab" onclick="openFeedback()">
+    <svg class="barry-mini" width="30" height="44" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="mf-body" cx="48%" cy="62%" r="52%">
+          <stop offset="0%"   stop-color="rgba(255,248,225,1)"/>
+          <stop offset="28%"  stop-color="rgba(255,210,110,.88)"/>
+          <stop offset="58%"  stop-color="rgba(240,145,55,.75)"/>
+          <stop offset="100%" stop-color="rgba(210,95,35,.58)"/>
+        </radialGradient>
+        <radialGradient id="mf-inner" cx="44%" cy="55%" r="38%">
+          <stop offset="0%"   stop-color="rgba(255,255,240,.82)"/>
+          <stop offset="100%" stop-color="rgba(255,215,100,0)"/>
+        </radialGradient>
+      </defs>
+      <path d="M40 6 C 52 28, 62 50, 60 75 C 58 98, 22 98, 20 75 C 18 50, 28 28, 40 6 Z" fill="url(#mf-body)"/>
+      <path d="M40 22 C 47 38, 52 55, 50 72 C 48 88, 32 88, 30 72 C 28 55, 33 38, 40 22 Z" fill="url(#mf-inner)" opacity=".6"/>
+      <path d="M32 82 Q40 90 48 82" stroke="rgba(160,70,10,.28)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    </svg>
+    <div class="feedback-label">feedback</div>
+  </div>
+
+  <!-- ── FEEDBACK MODAL ────────────────────────────────────────── -->
+  <div class="feedback-modal" id="feedbackModal" onclick="handleFeedbackBg(event)">
+    <div class="feedback-card">
+      <h3>Hey! What's on your mind? 🧡</h3>
+      <p>Erika reads every message. We genuinely want to know.</p>
+      <textarea id="feedbackText" rows="4" placeholder="Bugs, ideas, kind words, anything..."></textarea>
+      <div class="feedback-actions">
+        <button class="btn-fb-cancel" onclick="closeFeedback()">Cancel</button>
+        <button class="btn-fb-send" onclick="sendFeedback()">Send it →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="orb" id="orb-a"></div>
+  <div class="orb" id="orb-b"></div>
+  <div class="orb" id="orb-c"></div>
+
+  <button class="library-btn" onclick="openLibrary()">Library</button>
+  <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">☽</button>
+  <button class="settings-btn" onclick="toggleSettings()">Voice & Style</button>
+
+  <div class="settings-panel" id="settingsPanel">
+    <h3>Voice & style</h3>
+    <div class="field">
+      <label>Voice</label>
+      <select id="voiceSelect" onchange="if(this.value) localStorage.setItem('voiceId', this.value)"></select>
+    </div>
+    <div class="field">
+      <label>Personality & tone</label>
+      <div class="personality-bubbles" id="personalityBubbles"></div>
+      <button class="btn-add-personality" onclick="openNewPersonality()">+ Add tone</button>
+    </div>
+
+    <div class="field">
+      <label>Speed</label>
+      <div class="dial-row">
+        <div class="dial-wrap">
+          <input type="range" id="speedDial" min="0.7" max="1.2" step="0.05" value="0.7"
+            oninput="updateDial(this,'speedVal')">
+          <div class="dial-ends"><span>Slow</span><span>Fast</span></div>
+        </div>
+        <span class="dial-val" id="speedVal">0.7×</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Pauses</label>
+      <div class="dial-row">
+        <div class="dial-wrap">
+          <input type="range" id="pauseDial" min="1" max="6" step="1" value="2"
+            oninput="updateDial(this,'pauseVal')">
+          <div class="dial-ends"><span>Short</span><span>Long</span></div>
+        </div>
+        <span class="dial-val" id="pauseVal">2</span>
+      </div>
+    </div>
+
+    <button class="settings-save" onclick="saveVoice()">Save</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <!-- Step 1: request input -->
+  <div class="input-wrap" id="inputWrap">
+    <div class="suggestions" id="suggestions"></div>
+    <textarea id="request" rows="3"
+      placeholder="A 5-minute meditation to calm me before heading into a stressful meeting..."></textarea>
+    <div class="duration-row">
+      <button class="duration-chip" onclick="selectDuration(this,'1 minute')">1 min</button>
+      <button class="duration-chip" onclick="selectDuration(this,'3 minutes')">3 min</button>
+      <button class="duration-chip" onclick="selectDuration(this,'5 minutes')">5 min</button>
+      <button class="duration-chip" onclick="selectDuration(this,'10 minutes')">10 min</button>
+    </div>
+    <div class="duration-hint">Any other length? Just mention it in your message</div>
+    <button class="btn-begin" id="beginBtn" onclick="begin()">Write meditation</button>
+  </div>
+
+  <!-- Step 2: text display + listen button -->
+  <div class="text-panel" id="textPanel">
+    <div class="text-actions">
+      <button class="btn-listen" id="listenBtn" onclick="speak()">Listen</button>
+      <button class="btn-save" id="saveBtn" onclick="saveMeditation()">Save</button>
+      <button class="btn-rewrite" onclick="rewrite()">Write another</button>
+    </div>
+    <div class="text-scroll" id="textScroll"></div>
+  </div>
+
+  <!-- Library overlay -->
+  <div class="library-overlay" id="libraryOverlay">
+    <div class="library-header">
+      <h2>Saved meditations</h2>
+      <button class="library-close" onclick="closeLibrary()">✕</button>
+    </div>
+    <div class="folder-bar" id="folderBar"></div>
+    <div class="library-list" id="libraryList"></div>
+  </div>
+
+  <!-- Folder picker modal -->
+  <div class="folder-picker-modal" id="folderPickerModal" onclick="handleFolderPickerBg(event)">
+    <div class="folder-picker-card">
+      <h3>Add to folders</h3>
+      <div class="folder-picker-options" id="folderPickerOptions"></div>
+      <button class="folder-picker-cancel" onclick="closeFolderPicker()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Personality edit / create modal -->
+  <div class="personality-modal" id="personalityModal">
+    <div class="personality-modal-card">
+      <h3 id="personalityModalTitle">New tone</h3>
+      <div class="pm-field">
+        <label>Name</label>
+        <input class="pm-input" type="text" id="personalityModalName" placeholder="Warm & grounded...">
+      </div>
+      <div class="pm-field">
+        <label>Description</label>
+        <textarea class="pm-input" id="personalityModalText" rows="4"
+          placeholder="Describe the tone... grounded and warm, like a therapist. No spiritual language."></textarea>
+      </div>
+      <div class="personality-modal-actions">
+        <button class="btn-pm-delete" id="personalityDeleteBtn" onclick="deleteCurrentPersonality()">Delete</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-pm-cancel" onclick="closePersonalityModal()">Cancel</button>
+          <button class="btn-pm-save" onclick="savePersonalityModal()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirmation modal -->
+  <div class="delete-modal" id="deleteModal">
+    <div class="delete-card">
+      <!-- Curious Waldow: open eyes, one raised eyebrow, tilted head -->
+      <div class="delete-waldow">
+        <svg width="80" height="80" viewBox="0 0 110 110" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="dg-outer" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"   stop-color="rgba(255,160,60,.20)"/>
+              <stop offset="100%" stop-color="rgba(220,80,20,0)"/>
+            </radialGradient>
+            <radialGradient id="dg-mid" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"   stop-color="rgba(255,200,100,.28)"/>
+              <stop offset="100%" stop-color="rgba(230,100,20,0)"/>
+            </radialGradient>
+            <radialGradient id="dg-core" cx="40%" cy="35%" r="58%">
+              <stop offset="0%"   stop-color="rgba(255,245,215,1)"/>
+              <stop offset="28%"  stop-color="rgba(255,195,80,.95)"/>
+              <stop offset="62%"  stop-color="rgba(235,110,28,.88)"/>
+              <stop offset="100%" stop-color="rgba(195,55,8,.80)"/>
+            </radialGradient>
+            <filter id="dg-sf" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="4"/>
+            </filter>
+          </defs>
+          <circle cx="55" cy="55" r="54" fill="url(#dg-outer)"/>
+          <circle cx="55" cy="55" r="43" fill="url(#dg-mid)" filter="url(#dg-sf)"/>
+          <circle cx="55" cy="55" r="33" fill="url(#dg-core)"/>
+          <ellipse cx="47" cy="43" rx="11" ry="7" fill="rgba(255,255,240,.32)"/>
+          <!-- left eye: cheeky happy squint -->
+          <path d="M38 53 Q44 47 50 53" stroke="rgba(130,50,8,.55)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <!-- right eye: open and curious -->
+          <circle cx="66" cy="52" r="3.5" fill="rgba(130,50,8,.48)"/>
+          <!-- left eyebrow gently arched -->
+          <path d="M36 43 Q44 40 51 43" stroke="rgba(140,60,10,.48)" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- right eyebrow raised high (curious!) -->
+          <path d="M59 39 Q66 34 73 39" stroke="rgba(140,60,10,.55)" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- rosy cheeks -->
+          <ellipse cx="37" cy="61" rx="7" ry="4.5" fill="rgba(220,90,40,.14)"/>
+          <ellipse cx="73" cy="61" rx="7" ry="4.5" fill="rgba(220,90,40,.14)"/>
+          <!-- wide cheeky lopsided grin -->
+          <path d="M41 66 Q55 79 69 63" stroke="rgba(130,50,8,.45)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3>Are you sure?</h3>
+      <p>Just checking you want to delete this! - Waldow</p>
+      <div class="delete-actions">
+        <button class="btn-del-cancel" onclick="cancelDelete()">Keep it</button>
+        <button class="btn-del-confirm" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: player -->
+  <div class="player" id="player">
+    <button class="btn-pp" id="ppBtn" onclick="togglePlay()">❚❚</button>
+    <div class="player-row">
+      <span class="player-label" id="playerLabel">Playing</span>
+      <button class="btn-end" onclick="endSession()">End</button>
+    </div>
+  </div>
+
+  <audio id="audio"></audio>
+
+  <script>
+    const BASE = '';
+
+    // ── THEME ─────────────────────────────────────────────────────
+    function applyTheme(dark) {
+      document.body.classList.toggle('dark', dark);
+      document.getElementById('themeBtn').textContent = dark ? '☀︎' : '☽';
+    }
+    function toggleTheme() {
+      const dark = !document.body.classList.contains('dark');
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+      applyTheme(dark);
+    }
+    applyTheme(localStorage.getItem('theme') === 'dark');
+
+    // ── ORB ANIMATION ─────────────────────────────────────────────
+    const orbA = document.getElementById('orb-a');
+    const orbB = document.getElementById('orb-b');
+    const orbC = document.getElementById('orb-c');
+    let t = 0;
+
+    (function tick() {
+      t += 0.004;
+      orbA.style.cssText += `;left:${15 + 28*Math.sin(t*.6)}%;top:${10 + 22*Math.sin(t*1.1)}%`;
+      orbB.style.cssText += `;left:${45 + 25*Math.sin(t*.4+2.1)}%;top:${35 + 20*Math.sin(t*.7+1)}%`;
+      orbC.style.cssText += `;left:${55 + 18*Math.sin(t*.9+3.5)}%;top:${55 + 18*Math.sin(t*.5+.8)}%`;
+      requestAnimationFrame(tick);
+    })();
+
+    // ── SETTINGS ──────────────────────────────────────────────────
+    const DEFAULT_VOICE = 'atEhNo1k29EZslpsboHA'; // Callum
+
+    const RESET_IDS = new Set([
+      'xGDJhCwcqw94ypljc95Z', // Meditation Voice (removed)
+      '7dEuJHhweR5AFXA4INkB', // British Meditation Lady (old default)
+      'N2lVS1w4EtoT3dr4eOWO', // Callum (old ID)
+      'EXAVITQu4vr4xnSDxMaL', // Sarah
+      'nPczCjzI2devNBz1zQrb', // Brian
+      'pNInz6obpgDQGcFmaJgB', // Adam
+      'ErXwobaYiN019PkySvjV', // Antoni
+      'VR6AewLTigWG4xSOukaG', // Arnold
+      'IKne3meq5aSn9XLyUdCD', // Charlie
+      'SOYHLrjzK2X1ezoPC6cr', // Harry
+    ]);
+
+    let cachedVoices = [];
+
+    function renderVoiceSelectEl(sel, selectedId) {
+      sel.innerHTML = cachedVoices.map(v => {
+        const accent = v.labels?.accent || '';
+        const label  = accent ? ` — ${accent}` : '';
+        const picked = v.voice_id === selectedId ? ' selected' : '';
+        return `<option value="${v.voice_id}"${picked}>${v.name}${label}</option>`;
+      }).join('');
+    }
+
+    async function populateVoices() {
+      if (RESET_IDS.has(localStorage.getItem('voiceId'))) {
+        localStorage.setItem('voiceId', DEFAULT_VOICE);
+      }
+      renderPersonalityBubbles();
+      const savedId = localStorage.getItem('voiceId') || DEFAULT_VOICE;
+      try {
+        const res  = await fetch(`${BASE}/api/voices`);
+        const data = await res.json();
+        cachedVoices = data.voices || [];
+        renderVoiceSelectEl(document.getElementById('voiceSelect'), savedId);
+        if (!localStorage.getItem('voiceId')) localStorage.setItem('voiceId', DEFAULT_VOICE);
+      } catch (err) {
+        console.error('Could not load voices:', err);
+      }
+    }
+
+    let _settingsOpenPersonality = null;
+
+    function toggleSettings() {
+      const panel = document.getElementById('settingsPanel');
+      panel.classList.toggle('open');
+      if (panel.classList.contains('open')) {
+        _settingsOpenPersonality = localStorage.getItem('meditationPersonality') || '';
+      }
+    }
+
+    document.addEventListener('click', e => {
+      const p = document.getElementById('settingsPanel');
+      if (!p.contains(e.target) && !e.target.classList.contains('settings-btn')) {
+        p.classList.remove('open');
+      }
+    });
+
+    function defaultPersonalities() {
+      return [
+        { id: 'p-calm',    name: 'Calm & professional', text: 'Grounded, calm and professional — like a therapist. No spiritual language, no poetry, no metaphors. Clear, direct and reassuring.' },
+        { id: 'p-warm',    name: 'Warm & spiritual',    text: 'Gentle, poetic and warm. Use nature imagery, soft metaphors, and a sense of quiet wonder. Soulful but never preachy.' },
+        { id: 'p-minimal', name: 'Minimal & focused',   text: 'Very spare and minimal. Short phrases, long silences, no unnecessary words. Like a Zen teacher — direct, quiet, precise.' },
+      ];
+    }
+    function getPersonalities() {
+      try {
+        const stored = localStorage.getItem('personalities');
+        if (stored === null) return defaultPersonalities();
+        return JSON.parse(stored) || [];
+      } catch { return defaultPersonalities(); }
+    }
+    function setPersonalities(arr) { localStorage.setItem('personalities', JSON.stringify(arr)); }
+
+    function renderPersonalityBubbles() {
+      const personalities = getPersonalities();
+      const activeText = localStorage.getItem('meditationPersonality') || '';
+      document.getElementById('personalityBubbles').innerHTML = personalities.map(p => {
+        const active = p.text === activeText ? ' active' : '';
+        return `<div class="personality-bubble${active}" onclick="selectPersonality('${p.id}')">
+          <span class="bubble-label">${esc(p.name)}</span>
+          <button class="btn-edit-personality" onclick="openEditPersonality(event,'${p.id}')">✎</button>
+        </div>`;
+      }).join('');
+    }
+
+    function selectPersonality(id) {
+      const p = getPersonalities().find(x => x.id === id);
+      if (!p) return;
+      localStorage.setItem('meditationPersonality', p.text);
+      renderPersonalityBubbles();
+      if (document.getElementById('textPanel').classList.contains('on')) {
+        document.getElementById('settingsPanel').classList.remove('open');
+        begin();
+      }
+    }
+
+    let editingPersonalityId = null;
+
+    function openNewPersonality() {
+      editingPersonalityId = null;
+      document.getElementById('personalityModalTitle').textContent = 'New tone';
+      document.getElementById('personalityModalName').value = '';
+      document.getElementById('personalityModalText').value = '';
+      document.getElementById('personalityDeleteBtn').disabled = true;
+      document.getElementById('personalityModal').classList.add('on');
+    }
+
+    function openEditPersonality(e, id) {
+      e.stopPropagation();
+      editingPersonalityId = id;
+      const p = getPersonalities().find(x => x.id === id);
+      if (!p) return;
+      document.getElementById('personalityModalTitle').textContent = 'Edit tone';
+      document.getElementById('personalityModalName').value = p.name;
+      document.getElementById('personalityModalText').value = p.text;
+      document.getElementById('personalityDeleteBtn').disabled = false;
+      document.getElementById('personalityModal').classList.add('on');
+    }
+
+    function closePersonalityModal() {
+      document.getElementById('personalityModal').classList.remove('on');
+    }
+
+    function savePersonalityModal() {
+      const name = document.getElementById('personalityModalName').value.trim();
+      const text = document.getElementById('personalityModalText').value.trim();
+      if (!name || !text) return;
+      const activeText = localStorage.getItem('meditationPersonality') || '';
+      let personalities = getPersonalities();
+      if (editingPersonalityId) {
+        const idx = personalities.findIndex(x => x.id === editingPersonalityId);
+        if (idx >= 0) {
+          const wasActive = personalities[idx].text === activeText;
+          personalities[idx] = { id: editingPersonalityId, name, text };
+          if (wasActive) localStorage.setItem('meditationPersonality', text);
+        }
+      } else {
+        personalities.push({ id: 'p' + Date.now(), name, text });
+        localStorage.setItem('meditationPersonality', text);
+      }
+      setPersonalities(personalities);
+      renderPersonalityBubbles();
+      closePersonalityModal();
+    }
+
+    function deleteCurrentPersonality() {
+      if (!editingPersonalityId) return;
+      const personalities = getPersonalities();
+      const p = personalities.find(x => x.id === editingPersonalityId);
+      if (p && p.text === localStorage.getItem('meditationPersonality')) {
+        localStorage.removeItem('meditationPersonality');
+      }
+      setPersonalities(personalities.filter(x => x.id !== editingPersonalityId));
+      renderPersonalityBubbles();
+      closePersonalityModal();
+    }
+
+    function updateDial(input, valId) {
+      const min = parseFloat(input.min), max = parseFloat(input.max);
+      const val = parseFloat(input.value);
+      const pct = ((val - min) / (max - min) * 100).toFixed(1);
+      input.style.setProperty('--pct', pct + '%');
+      const el = document.getElementById(valId);
+      el.textContent = valId === 'speedVal' ? val.toFixed(2) + '×' : val;
+    }
+
+    function loadDials() {
+      const speed = parseFloat(localStorage.getItem('voiceSpeed') || '0.7');
+      const pause = parseInt(localStorage.getItem('voicePause') || '2');
+      const sd = document.getElementById('speedDial');
+      const pd = document.getElementById('pauseDial');
+      sd.value = speed; pd.value = pause;
+      updateDial(sd, 'speedVal');
+      updateDial(pd, 'pauseVal');
+    }
+
+    function saveVoice() {
+      const sel = document.getElementById('voiceSelect');
+      if (sel.value) localStorage.setItem('voiceId', sel.value);
+      localStorage.setItem('voiceSpeed', document.getElementById('speedDial').value);
+      localStorage.setItem('voicePause', document.getElementById('pauseDial').value);
+      document.getElementById('settingsPanel').classList.remove('open');
+
+      const newPersonality = localStorage.getItem('meditationPersonality') || '';
+      const textPanelOn = document.getElementById('textPanel').classList.contains('on');
+      if (textPanelOn && newPersonality !== _settingsOpenPersonality) {
+        begin();
+      }
+    }
+
+    populateVoices();
+    loadDials();
+
+    // ── LIBRARY ───────────────────────────────────────────────────
+    function getLibrary() {
+      try {
+        const lib = JSON.parse(localStorage.getItem('meditationLibrary') || '[]');
+        // migrate legacy single folderId to folderIds array
+        lib.forEach(m => {
+          if (m.folderId !== undefined && !m.folderIds) {
+            m.folderIds = m.folderId ? [m.folderId] : [];
+            delete m.folderId;
+          }
+        });
+        return lib;
+      } catch { return []; }
+    }
+    function setLibrary(arr) {
+      localStorage.setItem('meditationLibrary', JSON.stringify(arr));
+    }
+
+    // ── FOLDERS ───────────────────────────────────────────────────
+    function getFolders() {
+      try { return JSON.parse(localStorage.getItem('meditationFolders') || '[]'); }
+      catch { return []; }
+    }
+    function setFolders(arr) {
+      localStorage.setItem('meditationFolders', JSON.stringify(arr));
+    }
+
+    let currentFolderId = null;
+    let creatingFolder  = false;
+    let folderPickerMedId = null;
+
+    function renderFolderBar() {
+      const folders = getFolders();
+      const bar = document.getElementById('folderBar');
+      let html = `<button class="folder-chip${currentFolderId === null ? ' active' : ''}"
+        onclick="selectFolder(null)"
+        ondragover="onFolderDragOver(event,null)"
+        ondragenter="onFolderDragEnter(event)"
+        ondragleave="onFolderDragLeave(event)"
+        ondrop="onFolderDrop(event,null)">All</button>`;
+
+      folders.forEach(f => {
+        html += `<div class="folder-chip-wrap"
+          ondragover="onFolderDragOver(event,${f.id})"
+          ondragenter="onFolderDragEnter(event)"
+          ondragleave="onFolderDragLeave(event)"
+          ondrop="onFolderDrop(event,${f.id})">
+          <button class="folder-chip${currentFolderId === f.id ? ' active' : ''}" onclick="selectFolder(${f.id})">${esc(f.name)}</button>
+          <button class="folder-chip-del" onclick="deleteFolder(${f.id}, event)" title="Delete folder">✕</button>
+        </div>`;
+      });
+
+      if (creatingFolder) {
+        html += `<div class="folder-create-wrap">
+          <input class="folder-create-input" id="folderNameInput" placeholder="Folder name" maxlength="30"
+            onkeydown="handleFolderInputKey(event)">
+          <button class="folder-create-ok" onclick="confirmCreateFolder()">✓</button>
+          <button class="folder-create-cancel" onclick="cancelCreateFolder()">✕</button>
+        </div>`;
+      } else {
+        html += `<button class="folder-add-btn" onclick="startCreateFolder()">+ new folder</button>`;
+      }
+
+      bar.innerHTML = html;
+      if (creatingFolder) {
+        const input = document.getElementById('folderNameInput');
+        if (input) input.focus();
+      }
+    }
+
+    function selectFolder(id) {
+      currentFolderId = id;
+      renderFolderBar();
+      renderLibrary();
+    }
+
+    function startCreateFolder() {
+      creatingFolder = true;
+      renderFolderBar();
+    }
+
+    function cancelCreateFolder() {
+      creatingFolder = false;
+      renderFolderBar();
+    }
+
+    function confirmCreateFolder() {
+      const input = document.getElementById('folderNameInput');
+      const name  = (input?.value || '').trim();
+      if (!name) { cancelCreateFolder(); return; }
+      const folders = getFolders();
+      folders.push({ id: Date.now(), name });
+      setFolders(folders);
+      creatingFolder = false;
+      renderFolderBar();
+    }
+
+    function handleFolderInputKey(e) {
+      if (e.key === 'Enter')  confirmCreateFolder();
+      if (e.key === 'Escape') cancelCreateFolder();
+    }
+
+    function deleteFolder(id, e) {
+      e.stopPropagation();
+      setFolders(getFolders().filter(f => f.id !== id));
+      if (currentFolderId === id) currentFolderId = null;
+      renderFolderBar();
+      renderLibrary();
+    }
+
+    function showFolderPicker(medId) {
+      folderPickerMedId = medId;
+      const lib     = getLibrary();
+      const med     = lib.find(m => m.id === medId);
+      // migrate legacy single folderId
+      if (med && med.folderId && !med.folderIds) {
+        med.folderIds = [med.folderId];
+        delete med.folderId;
+        setLibrary(lib);
+      }
+      const currentIds = med?.folderIds || [];
+      const folders = getFolders();
+      let html = '';
+      if (!folders.length) {
+        html = `<div style="font-size:13px;color:rgba(28,10,4,.35);line-height:1.7">No folders yet —<br>create one with "+ new folder" above.</div>`;
+      } else {
+        folders.forEach(f => {
+          const on = currentIds.includes(f.id);
+          html += `<button class="folder-option${on ? ' active' : ''}" onclick="toggleFolder(${f.id})">${on ? '✓ ' : ''}${esc(f.name)}</button>`;
+        });
+      }
+      document.getElementById('folderPickerOptions').innerHTML = html;
+      document.getElementById('folderPickerModal').classList.add('on');
+    }
+
+    function toggleFolder(folderId) {
+      if (folderPickerMedId === null) return;
+      const lib = getLibrary();
+      const med = lib.find(m => m.id === folderPickerMedId);
+      if (!med) return;
+      med.folderIds = med.folderIds || [];
+      const idx = med.folderIds.indexOf(folderId);
+      if (idx === -1) med.folderIds.push(folderId);
+      else            med.folderIds.splice(idx, 1);
+      setLibrary(lib);
+      // refresh the picker options in place
+      showFolderPicker(folderPickerMedId);
+      renderLibrary();
+    }
+
+    function closeFolderPicker() {
+      document.getElementById('folderPickerModal').classList.remove('on');
+      folderPickerMedId = null;
+    }
+
+    function handleFolderPickerBg(e) {
+      if (e.target === e.currentTarget) closeFolderPicker();
+    }
+
+    // ── DRAG AND DROP ─────────────────────────────────────────────
+    function onDragStart(e, medId) {
+      e.dataTransfer.setData('text/plain', String(medId));
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function onFolderDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function onFolderDragEnter(e) {
+      e.preventDefault();
+      const el = e.currentTarget;
+      el._dragCount = (el._dragCount || 0) + 1;
+      el.classList.add('drag-over');
+    }
+
+    function onFolderDragLeave(e) {
+      const el = e.currentTarget;
+      el._dragCount = (el._dragCount || 1) - 1;
+      if (el._dragCount <= 0) { el._dragCount = 0; el.classList.remove('drag-over'); }
+    }
+
+    function onFolderDrop(e, folderId) {
+      e.preventDefault();
+      const el = e.currentTarget;
+      el._dragCount = 0;
+      el.classList.remove('drag-over');
+      const medId = parseInt(e.dataTransfer.getData('text/plain'));
+      if (!medId) return;
+      const lib = getLibrary();
+      const med = lib.find(m => m.id === medId);
+      if (med) {
+        med.folderId = folderId || null;
+        setLibrary(lib);
+        renderLibrary();
+      }
+    }
+
+    function saveMeditation() {
+      if (!currentText) return;
+      const req   = document.getElementById('request').value.trim();
+      const title = req.length > 60 ? req.slice(0, 57) + '…' : req;
+      const entry = {
+        id:    Date.now(),
+        title: title || 'Meditation',
+        text:  currentText,
+        date:  new Date().toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })
+      };
+      const lib = getLibrary();
+      lib.unshift(entry);
+      setLibrary(lib);
+
+      const btn = document.getElementById('saveBtn');
+      btn.textContent = 'Saved ✓';
+      btn.disabled = true;
+    }
+
+    function openLibrary() {
+      creatingFolder = false;
+      renderFolderBar();
+      renderLibrary();
+      document.getElementById('libraryOverlay').classList.add('on');
+    }
+    function closeLibrary() {
+      document.getElementById('libraryOverlay').classList.remove('on');
+    }
+
+    function renderLibrary() {
+      let lib     = getLibrary();
+      const list    = document.getElementById('libraryList');
+      const folders = getFolders();
+
+      if (currentFolderId !== null) {
+        lib = lib.filter(m => (m.folderIds || []).includes(currentFolderId));
+      }
+
+      if (!lib.length) {
+        const msg = currentFolderId !== null
+          ? 'No meditations in this folder yet.<br>Use the folder button on a card to move one here.'
+          : 'No saved meditations yet.<br>Write one and hit Save.';
+        list.innerHTML = `<div class="library-empty">${msg}</div>`;
+        return;
+      }
+
+      const folderSvg = `<svg width="14" height="12" viewBox="0 0 16 14" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"><path d="M1 3.5V11.5a1 1 0 001 1h12a1 1 0 001-1V5.5a1 1 0 00-1-1H7.8L6.3 2.8A1 1 0 005.5 2.5H2a1 1 0 00-1 1z"/></svg>`;
+
+      list.innerHTML = lib.map(m => {
+        const medFolderIds = m.folderIds || (m.folderId ? [m.folderId] : []);
+        const badges = medFolderIds
+          .map(fid => folders.find(f => f.id === fid))
+          .filter(Boolean)
+          .map(f => `<span class="med-card-folder-badge">${esc(f.name)}</span>`)
+          .join('');
+        return `
+          <div class="med-card" draggable="true" ondragstart="onDragStart(event,${m.id})">
+            <div class="med-card-body">
+              <div class="med-card-title">${esc(m.title)}</div>
+              <div class="med-card-date">${esc(m.date)}</div>
+              ${badges ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${badges}</div>` : ''}
+              <div class="med-card-preview">${esc(m.text.slice(0, 120))}…</div>
+            </div>
+            <div class="med-card-actions">
+              <button class="btn-card-play" onclick="playMeditation(${m.id})">Play</button>
+              <button class="btn-card-view" onclick="viewMeditation(${m.id})">View text</button>
+              <button class="btn-card-folder" onclick="showFolderPicker(${m.id})" title="Move to folder">${folderSvg}</button>
+              <button class="btn-card-del"   onclick="deleteMeditation(${m.id})">✕</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function loadMeditationData(id) {
+      const m = getLibrary().find(x => x.id === id);
+      if (!m) return null;
+      currentText = m.text;
+      document.getElementById('request').value = m.title;
+      document.getElementById('saveBtn').textContent = 'Save';
+      document.getElementById('saveBtn').disabled = false;
+      document.getElementById('listenBtn').disabled = false;
+      closeLibrary();
+      return m;
+    }
+
+    function viewMeditation(id) {
+      const m = loadMeditationData(id);
+      if (!m) return;
+      document.getElementById('textScroll').textContent = cleanForDisplay(m.text);
+      document.getElementById('inputWrap').classList.add('hidden');
+      document.getElementById('textPanel').classList.add('on');
+    }
+
+    function playMeditation(id) {
+      const m = loadMeditationData(id);
+      if (!m) return;
+      document.getElementById('inputWrap').classList.add('hidden');
+      document.getElementById('textPanel').classList.remove('on');
+      speak();
+    }
+
+    let pendingDeleteId = null;
+
+    function deleteMeditation(id) {
+      pendingDeleteId = id;
+      document.getElementById('deleteModal').classList.add('on');
+    }
+    function confirmDelete() {
+      if (pendingDeleteId !== null) {
+        setLibrary(getLibrary().filter(x => x.id !== pendingDeleteId));
+        pendingDeleteId = null;
+        renderLibrary();
+      }
+      document.getElementById('deleteModal').classList.remove('on');
+    }
+    function cancelDelete() {
+      pendingDeleteId = null;
+      document.getElementById('deleteModal').classList.remove('on');
+    }
+
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── SUGGESTIONS ───────────────────────────────────────────────
+    const SUGGESTION_POOL = [
+      'Calm me before a stressful meeting',
+      'Body scan to help me fall asleep',
+      'Self-compassion when I\'m being hard on myself',
+      'Breathwork to come back to the present moment',
+      '5-minute morning grounding to start the day',
+      'Letting go of something I can\'t control',
+      'Soothe my nervous system after a hard day',
+      'Visualisation for confidence before something big',
+      'Release tension and anxiety after work',
+      'Gratitude practice to close the day',
+      'Midday reset to clear mental fog',
+      'Open heart meditation for loneliness',
+      'Ground myself when I feel overwhelmed',
+      'Gentle wake-up to ease into the morning',
+      'Find stillness when my mind won\'t stop',
+      'Releasing guilt and forgiving myself',
+    ];
+
+    function renderSuggestions() {
+      const slot  = Math.floor(Date.now() / (12 * 60 * 60 * 1000));
+      const start = (slot * 4) % SUGGESTION_POOL.length;
+      const four  = Array.from({ length: 4 }, (_, i) =>
+        SUGGESTION_POOL[(start + i) % SUGGESTION_POOL.length]
+      );
+      document.getElementById('suggestions').innerHTML = four
+        .map(s => `<button class="chip" onclick="suggest(this)">${s}</button>`)
+        .join('');
+    }
+
+    renderSuggestions();
+
+    // ── MEDITATION ────────────────────────────────────────────────
+    function suggest(chip) {
+      document.getElementById('request').value = chip.textContent.trim();
+      document.getElementById('request').focus();
+    }
+
+    // Strip ellipses for display, keep them in currentText for TTS pauses
+    function cleanForDisplay(text) {
+      return text
+        .replace(/\.\.\.+/g, '.')                              // ... → single full stop
+        .replace(/\.+/g, '.')                                  // collapse doubled full stops
+        .replace(/ \./g, '.')                                  // tidy space-before-dot
+        .replace(/\.\s+([a-z])/g, (_, c) => '. ' + c.toUpperCase()) // capitalise after .
+        .trim();
+    }
+
+    let currentText = '';
+    let selectedDuration = null;
+
+    function selectDuration(btn, duration) {
+      if (selectedDuration === duration) {
+        selectedDuration = null;
+        document.querySelectorAll('.duration-chip').forEach(c => c.classList.remove('active'));
+      } else {
+        selectedDuration = duration;
+        document.querySelectorAll('.duration-chip').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+      }
+    }
+
+    function clearDuration() {
+      selectedDuration = null;
+      document.querySelectorAll('.duration-chip').forEach(c => c.classList.remove('active'));
+    }
+
+    async function begin() {
+      const req = document.getElementById('request').value.trim();
+      if (!req) return;
+
+      document.getElementById('beginBtn').disabled = true;
+
+      // Switch to text panel immediately — text will stream in
+      currentText = '';
+      let displayText = '';
+      const scroll = document.getElementById('textScroll');
+      const textPanel = document.getElementById('textPanel');
+      scroll.innerHTML = '';
+      textPanel.scrollTop = 0;
+      document.getElementById('saveBtn').disabled   = true;
+      document.getElementById('listenBtn').disabled = true;
+      document.getElementById('inputWrap').classList.add('hidden');
+      textPanel.classList.add('on');
+
+      try {
+        const r = await fetch(`${BASE}/api/meditate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            request: selectedDuration ? `${req} (${selectedDuration} long)` : req,
+            personality: localStorage.getItem('meditationPersonality') || ''
+          })
+        });
+
+        if (!r.ok) throw new Error('Could not reach server');
+
+        const reader  = r.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (raw === '[DONE]') continue;
+            try {
+              const msg = JSON.parse(raw);
+              if (msg.error) throw new Error(msg.error);
+              if (msg.chunk) {
+                currentText += msg.chunk;
+                const newDisplay = cleanForDisplay(currentText);
+                if (newDisplay.length > displayText.length) {
+                  const span = document.createElement('span');
+                  span.className = 'text-chunk';
+                  span.textContent = newDisplay.slice(displayText.length);
+                  scroll.appendChild(span);
+                  displayText = newDisplay;
+                }
+              }
+            } catch (e) {
+              if (e.message && !e.message.includes('JSON')) throw e;
+            }
+          }
+        }
+
+        if (typeof clearDuration === 'function') clearDuration();
+        document.getElementById('saveBtn').textContent = 'Save';
+        document.getElementById('saveBtn').disabled    = false;
+        document.getElementById('listenBtn').disabled  = false;
+
+      } catch (err) {
+        console.error(err);
+        showError(err.message);
+        setTimeout(hideStatus, 8000);
+        document.getElementById('textPanel').classList.remove('on');
+        document.getElementById('inputWrap').classList.remove('hidden');
+        document.getElementById('beginBtn').disabled = false;
+      }
+    }
+
+    async function speak() {
+      const voiceId = localStorage.getItem('voiceId') || DEFAULT_VOICE;
+      const listenBtn = document.getElementById('listenBtn');
+      listenBtn.disabled = true;
+      showStatus('Creating your voice...');
+
+      try {
+        console.log('[TTS text]', currentText);
+        const r = await fetch(`${BASE}/api/speak`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: currentText,
+            voiceId,
+            speed:      parseFloat(localStorage.getItem('voiceSpeed') || '0.7'),
+            pauseLevel: parseInt(localStorage.getItem('voicePause')  || '2')
+          })
+        });
+
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(`ElevenLabs: ${d.error || r.statusText}`);
+        }
+
+        const audio = document.getElementById('audio');
+        audio.src = URL.createObjectURL(await r.blob());
+
+        await new Promise(resolve => audio.addEventListener('canplaythrough', resolve, { once: true }));
+
+        hideStatus();
+        document.getElementById('textPanel').classList.remove('on');
+        document.getElementById('player').classList.add('on');
+        document.getElementById('ppBtn').textContent       = '❚❚';
+        document.getElementById('playerLabel').textContent = 'Playing';
+
+        audio.currentTime = 0;
+        await new Promise(resolve => setTimeout(resolve, 500));
+        audio.play();
+
+        audio.onended = () => {
+          document.getElementById('ppBtn').textContent       = '▶';
+          document.getElementById('playerLabel').textContent = 'Complete';
+        };
+
+      } catch (err) {
+        console.error(err);
+        showError(err.message);
+        setTimeout(hideStatus, 8000);
+        listenBtn.disabled = false;
+      }
+    }
+
+    function rewrite() {
+      currentText = '';
+      clearDuration();
+      document.getElementById('textPanel').classList.remove('on');
+      document.getElementById('inputWrap').classList.remove('hidden');
+      document.getElementById('beginBtn').disabled = false;
+    }
+
+    function togglePlay() {
+      const a = document.getElementById('audio');
+      if (a.paused) {
+        a.play();
+        document.getElementById('ppBtn').textContent       = '❚❚';
+        document.getElementById('playerLabel').textContent = 'Playing';
+      } else {
+        a.pause();
+        document.getElementById('ppBtn').textContent       = '▶';
+        document.getElementById('playerLabel').textContent = 'Paused';
+      }
+    }
+
+    function endSession() {
+      const a = document.getElementById('audio');
+      a.pause(); a.src = '';
+      document.getElementById('player').classList.remove('on');
+      document.getElementById('textPanel').classList.add('on');
+      document.getElementById('listenBtn').disabled = false;
+    }
+
+    function showStatus(msg) {
+      const el = document.getElementById('status');
+      el.className = 'status on';
+      el.innerHTML = `<span class="dot"></span>${msg}`;
+    }
+    function showError(msg) {
+      const el = document.getElementById('status');
+      el.className = 'status on error';
+      el.textContent = msg;
+    }
+    function hideStatus() {
+      document.getElementById('status').className = 'status';
+    }
+
+    document.getElementById('request').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); begin(); }
+    });
+
+    // ── INTRO ─────────────────────────────────────────────────────
+    let introSlide = 0;
+    const TOTAL_SLIDES = 3;
+
+    function showIntroSlide(n) {
+      document.querySelectorAll('.slide').forEach((s, i) => s.classList.toggle('active', i === n));
+      document.querySelectorAll('.intro-dot').forEach((d, i) => d.classList.toggle('active', i === n));
+      document.getElementById('introNextBtn').textContent = n === TOTAL_SLIDES - 1 ? "Let's go" : 'Next →';
+      document.getElementById('introBackBtn').style.display = n > 0 ? 'block' : 'none';
+      document.getElementById('introSkipBtn').style.display = n === TOTAL_SLIDES - 1 ? 'none' : 'block';
+    }
+
+    function introNext() {
+      if (introSlide < TOTAL_SLIDES - 1) {
+        introSlide++;
+        showIntroSlide(introSlide);
+      } else {
+        finishIntro();
+      }
+    }
+
+    function introBack() {
+      if (introSlide > 0) {
+        introSlide--;
+        showIntroSlide(introSlide);
+      }
+    }
+
+    function finishIntro() {
+      localStorage.setItem('hasVisited', '1');
+      const el = document.getElementById('intro');
+      el.classList.add('out');
+      setTimeout(() => el.classList.add('gone'), 520);
+    }
+
+    // Only show on first visit
+    if (localStorage.getItem('hasVisited')) {
+      document.getElementById('intro').classList.add('gone');
+    }
+
+    // ── FEEDBACK ──────────────────────────────────────────────────
+    function openFeedback() {
+      document.getElementById('feedbackModal').classList.add('on');
+      document.getElementById('feedbackText').focus();
+    }
+    function closeFeedback() {
+      document.getElementById('feedbackModal').classList.remove('on');
+    }
+    function handleFeedbackBg(e) {
+      if (e.target === e.currentTarget) closeFeedback();
+    }
+    function sendFeedback() {
+      const msg = document.getElementById('feedbackText').value.trim();
+      if (!msg) return;
+      window.location.href = `mailto:erikachoong123@gmail.com?subject=Grounded%20Feedback&body=${encodeURIComponent(msg)}`;
+      document.getElementById('feedbackText').value = '';
+      closeFeedback();
+    }
+
+    // ── SERVICE WORKER ────────────────────────────────────────────
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>

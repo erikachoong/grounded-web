@@ -1,0 +1,15 @@
+{
+  "name": "grounded",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node meditation-server.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
