@@ -924,7 +924,7 @@ function FrameListening({ onEnd, voiceId, voiceName, speed, pauses, duration, ti
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [audioError, setAudioError] = useState(false);
+  const [audioError, setAudioError] = useState(null);
   const [doneMsg, setDoneMsg] = useState(null);
   const audioRef = useRef(null);
   const intervalRef = useRef(null);
@@ -937,7 +937,7 @@ function FrameListening({ onEnd, voiceId, voiceName, speed, pauses, duration, ti
   useEffect(() => {
     if (!meditationText || !voiceId) return;
     let cancelled = false;
-    setLoading(true); setAudioError(false); setPaused(true); setElapsed(0);
+    setLoading(true); setAudioError(null); setPaused(true); setElapsed(0);
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; audioRef.current = null; }
     clearInterval(intervalRef.current);
 
@@ -948,50 +948,73 @@ function FrameListening({ onEnd, voiceId, voiceName, speed, pauses, duration, ti
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: meditationText, voiceId, speed: speed || 0.70, pauseLevel: pauses || 2 }),
         });
-        if (!r.ok || cancelled) throw new Error('failed');
+        if (cancelled) return;
+        if (!r.ok) throw new Error(`speak ${r.status}: ${await r.text().catch(() => r.statusText)}`);
 
-        // Stream audio via MediaSource — playback starts before full download
-        const ms = new MediaSource();
-        const audio = new Audio(URL.createObjectURL(ms));
-        audioRef.current = audio;
-        audio.onended = () => {
-          setPaused(true); clearInterval(intervalRef.current);
-          setDoneMsg(DONE_MESSAGES[Math.floor(Math.random() * DONE_MESSAGES.length)]);
-        };
+        const useMediaSource = typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported('audio/mpeg');
 
-        ms.addEventListener('sourceopen', async () => {
-          let sb;
-          try { sb = ms.addSourceBuffer('audio/mpeg'); }
-          catch { if (!cancelled) { setLoading(false); setAudioError(true); } return; }
+        const startPlayback = (audio) => {
+          audioRef.current = audio;
+          audio.onended = () => {
+            setPaused(true); clearInterval(intervalRef.current);
+            setDoneMsg(DONE_MESSAGES[Math.floor(Math.random() * DONE_MESSAGES.length)]);
+          };
+          audio.onerror = () => {
+            if (!cancelled) { setLoading(false); setAudioError(`audio.onerror code=${audio.error?.code} msg=${audio.error?.message}`); }
+          };
 
-          // Begin playback as soon as browser has buffered enough
+          const playTimeout = setTimeout(() => {
+            if (!cancelled) { setLoading(false); setAudioError(`canplay never fired (mse=${useMediaSource})`); }
+          }, 30000);
+
           audio.addEventListener('canplay', () => {
+            clearTimeout(playTimeout);
             if (cancelled) return;
             setLoading(false);
             audio.play()
               .then(() => { if (!cancelled) { setPaused(false); intervalRef.current = setInterval(() => setElapsed(s => s + 1), 1000); } })
-              .catch(() => {});
+              .catch(e => { if (!cancelled) setAudioError(`play() blocked: ${e.message}`); });
           }, { once: true });
+        };
 
-          const waitUpdate = () => new Promise(res => sb.addEventListener('updateend', res, { once: true }));
-          const reader = r.body.getReader();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (cancelled) break;
-            if (done) {
-              try {
-                if (sb.updating) await waitUpdate();
-                if (ms.readyState === 'open') ms.endOfStream();
-              } catch {}
-              break;
+        if (useMediaSource) {
+          const ms = new MediaSource();
+          const audio = new Audio(URL.createObjectURL(ms));
+          startPlayback(audio);
+
+          ms.addEventListener('sourceopen', async () => {
+            let sb;
+            try { sb = ms.addSourceBuffer('audio/mpeg'); }
+            catch (e) { if (!cancelled) { setLoading(false); setAudioError(`MSE addSourceBuffer: ${e.message}`); } return; }
+
+            const waitUpdate = () => new Promise(res => sb.addEventListener('updateend', res, { once: true }));
+            const reader = r.body.getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (cancelled) break;
+              if (done) {
+                try {
+                  if (sb.updating) await waitUpdate();
+                  if (ms.readyState === 'open') ms.endOfStream();
+                } catch {}
+                break;
+              }
+              if (sb.updating) await waitUpdate();
+              try { sb.appendBuffer(value); await waitUpdate(); }
+              catch (e) { if (!cancelled) setAudioError(`appendBuffer: ${e.message}`); break; }
             }
-            if (sb.updating) await waitUpdate();
-            try { sb.appendBuffer(value); await waitUpdate(); }
-            catch { break; }
-          }
-        }, { once: true });
+          }, { once: true });
+        } else {
+          // Fallback for iOS Safari — fetch full blob then play
+          const blob = await r.blob();
+          if (cancelled) return;
+          if (!blob.size) throw new Error(`empty blob (${blob.type})`);
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          startPlayback(audio);
+        }
 
-      } catch { if (!cancelled) { setLoading(false); setAudioError(true); } }
+      } catch (e) { if (!cancelled) { setLoading(false); setAudioError(e.message || 'unknown'); } }
     }
 
     loadAudio();
@@ -1042,14 +1065,14 @@ function FrameListening({ onEnd, voiceId, voiceName, speed, pauses, duration, ti
         </div>
       )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 32, opacity: doneMsg ? 0 : 1, transition: 'opacity .4s ease', pointerEvents: doneMsg ? 'none' : 'all' }}>
-        {loading && !audioError && (
+        {loading && !audioError  && (
           <div style={{ fontSize: 11, color: 'var(--ink-mute)', letterSpacing: '0.6px', marginBottom: 10, animation: 'pulse 1.4s ease-in-out infinite' }}>
             preparing your meditation…
           </div>
         )}
         {audioError && (
-          <div style={{ fontSize: 11, color: 'var(--ink-mute)', letterSpacing: '0.3px', marginBottom: 10 }}>
-            could not load audio
+          <div style={{ fontSize: 11, color: 'var(--ink-mute)', letterSpacing: '0.3px', marginBottom: 10, textAlign: 'center', maxWidth: 260 }}>
+            could not load audio<br/><span style={{ fontSize: 10, opacity: 0.7 }}>{audioError}</span>
           </div>
         )}
         {editing ? (
