@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Grounded",
+    "slug": "grounded",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "grounded",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#fffaf6"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.erikachoong.grounded",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#fffaf6"
+      },
+      "package": "com.erikachoong.grounded"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-av",
+      [
+        "expo-font",
+        {
+          "fonts": []
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -943,11 +943,21 @@ function FrameListening({ onEnd, voiceId, voiceName, speed, pauses, duration, ti
 
     async function loadAudio() {
       try {
-        const r = await fetch('/api/speak', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: meditationText, voiceId, speed: speed || 0.70, pauseLevel: pauses || 2 }),
-        });
+        const fetchAbort = new AbortController();
+        const fetchTimeout = setTimeout(() => fetchAbort.abort(), 60000);
+        let r;
+        try {
+          r = await fetch('/api/speak', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: meditationText, voiceId, speed: speed || 0.70, pauseLevel: pauses || 2 }),
+            signal: fetchAbort.signal,
+          });
+        } catch (e) {
+          throw new Error(`fetch failed: ${e.message}`);
+        } finally {
+          clearTimeout(fetchTimeout);
+        }
         if (cancelled) return;
         if (!r.ok) throw new Error(`speak ${r.status}: ${await r.text().catch(() => r.statusText)}`);
 
@@ -1056,12 +1066,25 @@ function FrameListening({ onEnd, voiceId, voiceName, speed, pauses, duration, ti
           <div style={{ fontWeight: 200, fontSize: 28, letterSpacing: '-0.4px', color: 'var(--ink)', textAlign: 'center', lineHeight: 1.4 }}>
             {doneMsg.split('\n').map((line, i) => <div key={i}>{line}</div>)}
           </div>
-          <button onClick={onEnd} style={{
-            fontFamily: 'inherit', background: 'transparent',
-            border: '1px solid var(--hairline-strong)', color: 'var(--ink-soft)',
-            padding: '10px 28px', borderRadius: 100, fontSize: 12,
-            cursor: 'pointer', letterSpacing: '0.4px', fontWeight: 300,
-          }}>done</button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {!saved && (
+              <button onClick={() => {
+                onSave?.({ title: (title || 'a quiet pause').toLowerCase().slice(0, 60), dur: `${duration} min`, mood: mood || 'Soothing', when: 'just now' });
+                setSaved(true);
+              }} style={{
+                fontFamily: 'inherit', background: 'transparent',
+                border: '1px solid var(--hairline-strong)', color: 'var(--ink-soft)',
+                padding: '10px 28px', borderRadius: 100, fontSize: 12,
+                cursor: 'pointer', letterSpacing: '0.4px', fontWeight: 300,
+              }}>save</button>
+            )}
+            <button onClick={onEnd} style={{
+              fontFamily: 'inherit', background: 'transparent',
+              border: '1px solid var(--hairline-strong)', color: 'var(--ink-soft)',
+              padding: '10px 28px', borderRadius: 100, fontSize: 12,
+              cursor: 'pointer', letterSpacing: '0.4px', fontWeight: 300,
+            }}>done</button>
+          </div>
         </div>
       )}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 32, opacity: doneMsg ? 0 : 1, transition: 'opacity .4s ease', pointerEvents: doneMsg ? 'none' : 'all' }}>
@@ -1099,7 +1122,7 @@ function FrameListening({ onEnd, voiceId, voiceName, speed, pauses, duration, ti
           </button>
         )}
         <div style={{ fontSize: 11, color: 'var(--ink-mute)', letterSpacing: '0.6px', fontWeight: 300 }}>
-          {voiceName} · {duration} min
+          {voiceName}
         </div>
       </div>
 
@@ -1284,32 +1307,107 @@ function FrameStyle({ onClose, personality, setPersonality, features, setFeature
     return s;
   });
 
+  const [customMoods, setCustomMoods] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('grounded_custom_moods') || '[]'); } catch { return []; }
+  });
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({ name: '', note: '' });
+
+  const saveCustom = () => {
+    const name = draft.name.trim();
+    if (!name) return;
+    const note = draft.note.trim() || '';
+    const next = [...customMoods, { name, note }];
+    setCustomMoods(next);
+    localStorage.setItem('grounded_custom_moods', JSON.stringify(next));
+    setPersonality(name);
+    setDraft({ name: '', note: '' });
+    setAdding(false);
+  };
+
+  const deleteCustom = (name) => {
+    const next = customMoods.filter(m => m.name !== name);
+    setCustomMoods(next);
+    localStorage.setItem('grounded_custom_moods', JSON.stringify(next));
+    if (personality === name) setPersonality('Soothing');
+  };
+
+  const allMoods = [...MOODS.map(m => ({ ...m, builtin: true })), ...customMoods.map(m => ({ ...m, builtin: false }))];
+
   return (
     <div style={frameWrap}>
       <div style={{ padding: '8px 24px 0', textAlign: 'center' }}><Eyebrow>style</Eyebrow></div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 26px 8px' }} className="scroll">
-        <div style={{ fontWeight: 200, fontSize: 22, lineHeight: 1.3, color: 'var(--ink)', marginBottom: 16, letterSpacing: '-0.4px' }}>
+        <div style={{ fontWeight: 200, fontSize: 22, lineHeight: 1.3, color: 'var(--ink)', marginBottom: 16, letterSpacing: '-0.4px', marginTop: 48 }}>
           choose how it<br/>speaks to you.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-          {MOODS.map(s => {
+          {allMoods.map(s => {
             const active = s.name === personality;
             return (
-              <button key={s.name} onClick={() => setPersonality(s.name)} style={{
-                fontFamily: 'inherit', textAlign: 'left',
-                ...Glass({ background: active ? 'rgba(255,255,255,0.16)' : 'var(--surface)', border: active ? '1px solid var(--hairline-strong)' : '1px solid var(--hairline)' }),
-                borderRadius: 22, padding: '12px 14px', color: 'var(--ink)',
-                cursor: 'pointer', transition: 'all .25s ease', display: 'flex', alignItems: 'center', gap: 12,
-              }}>
-                <MoodGlyph kind={s.glyph} active={active}/>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 2 }}>{s.name}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--ink-mute)', fontWeight: 300 }}>{s.note}</div>
-                </div>
-                {active && <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7l3 3 5-6" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-              </button>
+              <div key={s.name} style={{ position: 'relative' }}>
+                <button onClick={() => setPersonality(s.name)} style={{
+                  width: '100%', fontFamily: 'inherit', textAlign: 'left',
+                  ...Glass({ background: active ? 'rgba(255,255,255,0.16)' : 'var(--surface)', border: active ? '1px solid var(--hairline-strong)' : '1px solid var(--hairline)' }),
+                  borderRadius: 22, padding: '12px 14px', color: 'var(--ink)',
+                  cursor: 'pointer', transition: 'all .25s ease', display: 'flex', alignItems: 'center', gap: 12,
+                }}>
+                  {s.builtin
+                    ? <MoodGlyph kind={s.glyph} active={active}/>
+                    : <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, border: '1px solid var(--hairline-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: active ? 1 : 0.5 }}>
+                        <svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                      </div>
+                  }
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 2 }}>{s.name}</div>
+                    {s.note && <div style={{ fontSize: 11.5, color: 'var(--ink-mute)', fontWeight: 300 }}>{s.note}</div>}
+                  </div>
+                  {active && <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7l3 3 5-6" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                </button>
+                {!s.builtin && (
+                  <button onClick={() => deleteCustom(s.name)} style={{
+                    position: 'absolute', top: 10, right: 10, background: 'transparent', border: 'none',
+                    color: 'var(--ink-mute)', cursor: 'pointer', padding: 4, lineHeight: 1,
+                  }}>
+                    <svg width="11" height="11" viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                  </button>
+                )}
+              </div>
             );
           })}
+
+          {adding ? (
+            <div style={{ ...Glass({ border: '1px solid var(--hairline-strong)' }), borderRadius: 22, padding: '14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <input
+                autoFocus
+                placeholder="style name (e.g. Fierce)"
+                value={draft.name}
+                onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') saveCustom(); if (e.key === 'Escape') setAdding(false); }}
+                style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--hairline-strong)', outline: 'none', color: 'var(--ink)', fontSize: 14, fontWeight: 500, fontFamily: 'inherit', padding: '2px 0', width: '100%' }}
+              />
+              <input
+                placeholder="short description (optional)"
+                value={draft.note}
+                onChange={e => setDraft(d => ({ ...d, note: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') saveCustom(); if (e.key === 'Escape') setAdding(false); }}
+                style={{ background: 'transparent', border: 'none', borderBottom: '1px solid var(--hairline)', outline: 'none', color: 'var(--ink-soft)', fontSize: 12, fontFamily: 'inherit', padding: '2px 0', width: '100%' }}
+              />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button onClick={() => setAdding(false)} style={{ fontFamily: 'inherit', background: 'transparent', border: 'none', color: 'var(--ink-mute)', fontSize: 12, cursor: 'pointer' }}>cancel</button>
+                <button onClick={saveCustom} style={{ fontFamily: 'inherit', background: 'transparent', border: '1px solid var(--hairline-strong)', color: 'var(--ink)', fontSize: 12, borderRadius: 100, padding: '5px 14px', cursor: 'pointer' }}>add</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setAdding(true)} style={{
+              fontFamily: 'inherit', background: 'transparent', border: '1px dashed var(--hairline-strong)',
+              borderRadius: 22, padding: '12px 14px', color: 'var(--ink-mute)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 300,
+            }}>
+              <svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+              add your own style
+            </button>
+          )}
         </div>
 
         {/* Feature checkboxes */}
