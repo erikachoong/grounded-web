@@ -1,66 +1,67 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import { Voice } from './types';
 
-// ── CONFIG ──────────────────────────────────────────────────────────────────
-// During dev with iPhone on Expo Go: change this to your Mac's local IP
-// Find your IP: System Preferences → Network, or run `ipconfig getifaddr en0`
-// Example: 'http://192.168.1.42:3003'
-// For iOS Simulator: 'http://localhost:3003'
-export const BASE = 'http://localhost:3003';
+export const BASE = 'https://grounded-web-production.up.railway.app';
 
-// ── VOICES ──────────────────────────────────────────────────────────────────
 export async function fetchVoices(): Promise<Voice[]> {
   const res = await fetch(`${BASE}/api/voices`);
   const data = await res.json();
   return data.voices ?? [];
 }
 
-// ── MEDITATION STREAMING ────────────────────────────────────────────────────
+// XHR-based streaming — React Native's fetch doesn't reliably support body.getReader()
 export async function streamMeditation(
   request: string,
   personality: string,
   onChunk: (chunk: string) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`${BASE}/api/meditate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ request, personality }),
-    signal,
-  });
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let offset = 0;
 
-  if (!res.ok) throw new Error('Server error: ' + res.statusText);
+    xhr.open('POST', `${BASE}/api/meditate`);
+    xhr.setRequestHeader('Content-Type', 'application/json');
 
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error('Streaming not supported');
+    const onAbort = () => {
+      xhr.abort();
+      reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    };
+    signal.addEventListener('abort', onAbort);
 
-  const decoder = new TextDecoder();
-  let buf = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const lines = buf.split('\n');
-    buf = lines.pop() ?? '';
-
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const raw = line.slice(6).trim();
-      if (raw === '[DONE]') continue;
-      try {
-        const msg = JSON.parse(raw);
-        if (msg.error) throw new Error(msg.error);
-        if (msg.chunk) onChunk(msg.chunk);
-      } catch (e) {
-        if (e instanceof SyntaxError) continue;
-        throw e;
+    xhr.onprogress = () => {
+      const newText = xhr.responseText.slice(offset);
+      offset = xhr.responseText.length;
+      const lines = newText.split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (raw === '[DONE]') continue;
+        try {
+          const msg = JSON.parse(raw);
+          if (msg.error) { reject(new Error(msg.error)); return; }
+          if (msg.chunk) onChunk(msg.chunk);
+        } catch (e) {
+          if (!(e instanceof SyntaxError)) { reject(e); return; }
+        }
       }
-    }
-  }
+    };
+
+    xhr.onload = () => {
+      signal.removeEventListener('abort', onAbort);
+      if (xhr.status >= 400) reject(new Error(`Server error: ${xhr.status}`));
+      else resolve();
+    };
+
+    xhr.onerror = () => {
+      signal.removeEventListener('abort', onAbort);
+      reject(new Error('Network error'));
+    };
+
+    xhr.send(JSON.stringify({ request, personality }));
+  });
 }
 
-// ── AUDIO ────────────────────────────────────────────────────────────────────
 export async function generateAudio(
   text: string,
   voiceId: string,
@@ -81,7 +82,6 @@ export async function generateAudio(
   const buffer = await res.arrayBuffer();
   const uint8 = new Uint8Array(buffer);
 
-  // Convert to base64 in chunks to avoid stack overflow
   let binary = '';
   const chunk = 8192;
   for (let i = 0; i < uint8.length; i += chunk) {

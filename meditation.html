@@ -819,6 +819,10 @@ function FrameGenerating({ onListen, onBack, onSave, onOpenLibrary, prompt, dura
             }
             try {
               const msg = JSON.parse(raw);
+              if (msg.error) {
+                if (!cancelledRef.current) { setLines(['something went quiet... please try again.']); setDone(true); }
+                return;
+              }
               if (msg.chunk) {
                 fullTextRef.current += msg.chunk;
                 pendingRef.current += msg.chunk;
@@ -835,7 +839,10 @@ function FrameGenerating({ onListen, onBack, onSave, onOpenLibrary, prompt, dura
         }
 
         if (pendingRef.current.trim()) setLines(l => [...l, pendingRef.current]);
-        if (!cancelledRef.current) { setDone(true); onReady?.(fullTextRef.current.trim()); }
+        if (!cancelledRef.current) {
+          if (!fullTextRef.current.trim()) { setLines(['something went quiet... please try again.']); }
+          setDone(true); onReady?.(fullTextRef.current.trim());
+        }
       } catch (err) {
         if (!cancelledRef.current) {
           setLines(['something went quiet... please try again.']);
@@ -1015,12 +1022,18 @@ function FrameListening({ onEnd, voiceId, voiceName, speed, pauses, duration, ti
             }
           }, { once: true });
         } else {
-          // Fallback for iOS Safari — fetch full blob then play
+          // Fallback — blob URLs unreliable on iOS Safari/WebView, use base64 data URL
           const blob = await r.blob();
           if (cancelled) return;
           if (!blob.size) throw new Error(`empty blob (${blob.type})`);
-          const url = URL.createObjectURL(blob);
-          const audio = new Audio(url);
+          const dataUrl = await new Promise((resolve, reject) => {
+            const fr = new FileReader();
+            fr.onload = () => resolve(fr.result);
+            fr.onerror = () => reject(new Error('FileReader failed'));
+            fr.readAsDataURL(blob);
+          });
+          if (cancelled) return;
+          const audio = new Audio(dataUrl);
           startPlayback(audio);
         }
 

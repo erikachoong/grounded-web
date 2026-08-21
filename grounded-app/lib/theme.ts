@@ -1,39 +1,30 @@
+// Dark purple palette matching the web app
 export const C = {
-  // Brand
-  flame: 'rgba(210,70,15,0.92)',
-  flameSoft: 'rgba(210,70,15,0.10)',
-  flameBorder: 'rgba(210,70,15,0.35)',
-
-  // Light theme
-  bgLight: '#fffaf6',
-  textLight: 'rgba(28,10,4,0.84)',
-  textMutedLight: 'rgba(28,10,4,0.42)',
-  textDimLight: 'rgba(28,10,4,0.28)',
-  cardBgLight: 'rgba(255,255,255,0.72)',
-  cardBorderLight: 'rgba(200,100,40,0.14)',
-  inputBgLight: 'rgba(255,255,255,0.75)',
-  inputBorderLight: 'rgba(200,100,40,0.18)',
-
-  // Dark theme
-  bgDark: '#0d0704',
-  textDark: 'rgba(255,230,200,0.88)',
-  textMutedDark: 'rgba(255,200,140,0.55)',
-  textDimDark: 'rgba(255,200,140,0.28)',
-  cardBgDark: 'rgba(255,140,50,0.06)',
-  cardBorderDark: 'rgba(255,140,50,0.14)',
-  inputBgDark: 'rgba(255,140,50,0.07)',
-  inputBorderDark: 'rgba(255,140,50,0.20)',
+  bg: '#13101f',
+  ink: 'rgba(245,238,255,0.92)',
+  inkSoft: 'rgba(245,238,255,0.62)',
+  inkMute: 'rgba(245,238,255,0.34)',
+  inkFaint: 'rgba(245,238,255,0.16)',
+  surface: 'rgba(255,255,255,0.06)',
+  surface2: 'rgba(255,255,255,0.10)',
+  hairline: 'rgba(255,255,255,0.12)',
+  hairlineStrong: 'rgba(255,255,255,0.22)',
+  accentText: 'rgba(245,228,196,0.96)',
+  accentBorder: 'rgba(232,180,110,0.55)',
+  accentGlow: 'rgba(216,165,96,0.30)',
+  accentBg: 'rgba(20,16,38,0.80)',
+  accentSurface: 'rgba(232,180,110,0.12)',
 } as const;
 
-export function t(dark: boolean) {
+export function t(_dark: boolean) {
   return {
-    bg: dark ? C.bgDark : C.bgLight,
-    text: dark ? C.textDark : C.textLight,
-    textMuted: dark ? C.textMutedDark : C.textMutedLight,
-    textDim: dark ? C.textDimDark : C.textDimLight,
-    cardBg: dark ? C.cardBgDark : C.cardBgLight,
-    cardBorder: dark ? C.cardBorderDark : C.cardBorderLight,
-    inputBg: dark ? C.inputBgDark : C.inputBgLight,
-    inputBorder: dark ? C.inputBorderDark : C.inputBorderLight,
+    bg: C.bg,
+    text: C.ink,
+    textMuted: C.inkSoft,
+    textDim: C.inkMute,
+    cardBg: C.surface,
+    cardBorder: C.hairline,
+    inputBg: C.surface,
+    inputBorder: C.hairline,
   };
 }

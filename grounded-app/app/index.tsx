@@ -1,55 +1,52 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
   Animated, KeyboardAvoidingView, Platform, Dimensions, Keyboard,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 
-import Orbs from '../components/Orbs';
 import Library from '../components/Library';
 import Settings from '../components/Settings';
 import DeleteModal from '../components/DeleteModal';
 import PersonalityModal from '../components/PersonalityModal';
 import FolderPickerModal from '../components/FolderPickerModal';
 import IntroOverlay from '../components/IntroOverlay';
+import { GlassButton } from '../components/GlassButton';
+import { PrimaryButton } from '../components/PrimaryButton';
 
 import { storage } from '../lib/storage';
 import { streamMeditation, generateAudio, fetchVoices } from '../lib/api';
-import { t } from '../lib/theme';
+import { colors, type as ty, space, radius } from '../theme/tokens';
+import { familyForWeight } from '../theme/fonts';
 import { Meditation, Folder, Personality, Voice, AppSettings } from '../lib/types';
 
 type ScreenView = 'home' | 'text' | 'player';
 
 const { width: W } = Dimensions.get('window');
 
-const SUGGESTIONS = [
-  'Calm me before a stressful meeting',
-  'Body scan to help me fall asleep',
-  'Self-compassion when I\'m being hard on myself',
-  'Breathwork to come back to the present moment',
-  '5-minute morning grounding to start the day',
-  'Letting go of something I can\'t control',
-  'Soothe my nervous system after a hard day',
-  'Visualisation for confidence before something big',
-  'Release tension and anxiety after work',
-  'Gratitude practice to close the day',
-  'Midday reset to clear mental fog',
-  'Open heart meditation for loneliness',
-  'Ground myself when I feel overwhelmed',
-  'Gentle wake-up to ease into the morning',
-  'Find stillness when my mind won\'t stop',
-  'Releasing guilt and forgiving myself',
+const ALL_SUGGESTIONS = [
+  'a soft place to land after a hard day',
+  "I'm tired but my mind won't stop",
+  'help me come back into my body',
+  'something to start the morning gently',
+  'calm me before a stressful meeting',
+  'body scan to help me fall asleep',
+  'breathwork to come back to the present moment',
+  'letting go of something I can\'t control',
+  'release tension and anxiety after work',
+  'open heart meditation for loneliness',
+  'find stillness when my mind won\'t stop',
+  'releasing guilt and forgiving myself',
 ];
 
-const DURATIONS = ['5 min', '10 min', '20 min'];
+const DURATIONS = [1, 3, 5, 10];
 
 function getSuggestions() {
   const slot = Math.floor(Date.now() / (12 * 60 * 60 * 1000));
-  const start = (slot * 4) % SUGGESTIONS.length;
-  return Array.from({ length: 4 }, (_, i) => SUGGESTIONS[(start + i) % SUGGESTIONS.length]);
+  const start = (slot * 4) % ALL_SUGGESTIONS.length;
+  return Array.from({ length: 4 }, (_, i) => ALL_SUGGESTIONS[(start + i) % ALL_SUGGESTIONS.length]);
 }
 
 function cleanForDisplay(text: string) {
@@ -57,12 +54,6 @@ function cleanForDisplay(text: string) {
 }
 
 export default function GroundedScreen() {
-  const insets = useSafeAreaInsets();
-
-  // ── theme ───────────────────────────────────────────────────────────────
-  const [dark, setDark] = useState(false);
-  const th = t(dark);
-
   // ── views ───────────────────────────────────────────────────────────────
   const [view, setView] = useState<ScreenView>('home');
   const [showLibrary, setShowLibrary] = useState(false);
@@ -89,8 +80,7 @@ export default function GroundedScreen() {
 
   // ── meditation state ────────────────────────────────────────────────────
   const [requestText, setRequestText] = useState('');
-  const [selectedDuration, setSelectedDuration] = useState<string | null>(null);
-  const [meditationText, setMeditationText] = useState('');
+  const [selectedDuration, setSelectedDuration] = useState<number>(5);
   const [displayText, setDisplayText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -123,69 +113,37 @@ export default function GroundedScreen() {
     ppBreathAnim.current?.stop();
     ppBreath.setValue(0);
   }
-
   const ppScale = ppBreath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.13] });
 
-  // ── load persisted state ────────────────────────────────────────────────
+  // ── init ─────────────────────────────────────────────────────────────────
   useEffect(() => {
     async function init() {
-      const [lib, fol, per, setts, theme, visited] = await Promise.all([
+      const [lib, fol, per, setts, visited] = await Promise.all([
         storage.getLibrary(),
         storage.getFolders(),
         storage.getPersonalities(),
         storage.getSettings(),
-        storage.getTheme(),
         storage.getHasVisited(),
       ]);
       setLibraryState(lib);
       setFoldersState(fol);
       setPersonalitiesState(per);
       setSettingsState(setts);
-      setDark(theme === 'dark');
       if (!visited) setShowIntro(true);
     }
     init();
-
-    // Set up audio session for background play
-    Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-    });
-
-    // Load voices
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true });
     fetchVoices().then(setVoices).catch(() => {});
-
-    return () => {
-      soundRef.current?.unloadAsync();
-    };
+    return () => { soundRef.current?.unloadAsync(); };
   }, []);
 
-  // ── persist helpers ─────────────────────────────────────────────────────
-  async function updateLibrary(lib: Meditation[]) {
-    setLibraryState(lib);
-    await storage.setLibrary(lib);
-  }
-  async function updateFolders(fol: Folder[]) {
-    setFoldersState(fol);
-    await storage.setFolders(fol);
-  }
-  async function updatePersonalities(per: Personality[]) {
-    setPersonalitiesState(per);
-    await storage.setPersonalities(per);
-  }
-  async function updateSettings(s: AppSettings) {
-    setSettingsState(s);
-    await storage.setSettings(s);
-  }
+  // ── persist helpers ──────────────────────────────────────────────────────
+  async function updateLibrary(lib: Meditation[]) { setLibraryState(lib); await storage.setLibrary(lib); }
+  async function updateFolders(fol: Folder[]) { setFoldersState(fol); await storage.setFolders(fol); }
+  async function updatePersonalities(per: Personality[]) { setPersonalitiesState(per); await storage.setPersonalities(per); }
+  async function updateSettings(s: AppSettings) { setSettingsState(s); await storage.setSettings(s); }
 
-  // ── theme toggle ────────────────────────────────────────────────────────
-  async function toggleTheme() {
-    const next = !dark;
-    setDark(next);
-    await storage.setTheme(next ? 'dark' : 'light');
-  }
-
-  // ── begin meditation ────────────────────────────────────────────────────
+  // ── begin ────────────────────────────────────────────────────────────────
   async function begin() {
     const req = requestText.trim();
     if (!req) return;
@@ -196,7 +154,6 @@ export default function GroundedScreen() {
     abortRef.current = new AbortController();
 
     meditationTextRef.current = '';
-    setMeditationText('');
     setDisplayText('');
     setIsSaved(false);
     setError(null);
@@ -204,15 +161,13 @@ export default function GroundedScreen() {
     setView('text');
 
     try {
-      const fullRequest = selectedDuration ? `${req} (${selectedDuration} long)` : req;
+      const fullRequest = `${req} (${selectedDuration} min long)`;
       await streamMeditation(
         fullRequest,
         settings.personality,
         (chunk) => {
           meditationTextRef.current += chunk;
-          const display = cleanForDisplay(meditationTextRef.current);
-          setMeditationText(meditationTextRef.current);
-          setDisplayText(display);
+          setDisplayText(cleanForDisplay(meditationTextRef.current));
           setTimeout(() => textScrollRef.current?.scrollToEnd({ animated: true }), 50);
         },
         abortRef.current.signal,
@@ -226,24 +181,18 @@ export default function GroundedScreen() {
     }
   }
 
-  // ── speak ───────────────────────────────────────────────────────────────
+  // ── speak ────────────────────────────────────────────────────────────────
   async function speak() {
     if (!meditationTextRef.current) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsLoadingAudio(true);
     setError(null);
-
     try {
       await soundRef.current?.unloadAsync();
       soundRef.current = null;
-
       const uri = await generateAudio(
-        meditationTextRef.current,
-        settings.voiceId,
-        settings.voiceSpeed,
-        settings.voicePause,
+        meditationTextRef.current, settings.voiceId, settings.voiceSpeed, settings.voicePause,
       );
-
       const { sound } = await Audio.Sound.createAsync(
         { uri },
         { shouldPlay: true },
@@ -267,7 +216,6 @@ export default function GroundedScreen() {
     }
   }
 
-  // ── toggle play/pause ───────────────────────────────────────────────────
   async function togglePlay() {
     if (!soundRef.current) return;
     const status = await soundRef.current.getStatusAsync();
@@ -284,7 +232,6 @@ export default function GroundedScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
-  // ── end session ─────────────────────────────────────────────────────────
   async function endSession() {
     await soundRef.current?.stopAsync();
     stopPPBreath();
@@ -292,22 +239,18 @@ export default function GroundedScreen() {
     setView('text');
   }
 
-  // ── rewrite ─────────────────────────────────────────────────────────────
   function rewrite() {
     abortRef.current?.abort();
     setView('home');
-    setSelectedDuration(null);
   }
 
-  // ── save ────────────────────────────────────────────────────────────────
   async function saveMeditation() {
     if (!meditationTextRef.current || !requestText.trim()) return;
     const title = requestText.trim().length > 60
       ? requestText.trim().slice(0, 57) + '…'
       : requestText.trim();
     const entry: Meditation = {
-      id: Date.now(),
-      title,
+      id: Date.now(), title,
       text: meditationTextRef.current,
       date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
       folderIds: [],
@@ -317,41 +260,28 @@ export default function GroundedScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
-  // ── library actions ─────────────────────────────────────────────────────
+  // ── library ───────────────────────────────────────────────────────────────
   function playFromLibrary(m: Meditation) {
     meditationTextRef.current = m.text;
-    setMeditationText(m.text);
     setDisplayText(cleanForDisplay(m.text));
     setRequestText(m.title);
     setIsSaved(true);
     setShowLibrary(false);
     speak();
   }
-
   function viewFromLibrary(m: Meditation) {
     meditationTextRef.current = m.text;
-    setMeditationText(m.text);
     setDisplayText(cleanForDisplay(m.text));
     setRequestText(m.title);
     setIsSaved(true);
     setShowLibrary(false);
     setView('text');
   }
-
-  async function deleteFromLibrary(id: number) {
-    setDeleteTarget(id);
-  }
-
   async function confirmDelete() {
     if (deleteTarget === null) return;
     await updateLibrary(library.filter(m => m.id !== deleteTarget));
     setDeleteTarget(null);
   }
-
-  function handleFolder(m: Meditation) {
-    setFolderTarget(m);
-  }
-
   async function toggleFolder(medId: number, folderId: number) {
     const lib = library.map(m => {
       if (m.id !== medId) return m;
@@ -362,18 +292,11 @@ export default function GroundedScreen() {
     await updateLibrary(lib);
     setFolderTarget(lib.find(m => m.id === medId) ?? null);
   }
-
-  async function addFolder(name: string) {
-    await updateFolders([...folders, { id: Date.now(), name }]);
-  }
-
+  async function addFolder(name: string) { await updateFolders([...folders, { id: Date.now(), name }]); }
   async function deleteFolder(id: number) {
     await updateFolders(folders.filter(f => f.id !== id));
-    const lib = library.map(m => ({ ...m, folderIds: (m.folderIds ?? []).filter(fid => fid !== id) }));
-    await updateLibrary(lib);
+    await updateLibrary(library.map(m => ({ ...m, folderIds: (m.folderIds ?? []).filter(fid => fid !== id) })));
   }
-
-  // ── personality actions ─────────────────────────────────────────────────
   async function savePersonality(p: Personality) {
     const list = editingPersonality && editingPersonality !== 'new'
       ? personalities.map(x => x.id === p.id ? p : x)
@@ -381,46 +304,23 @@ export default function GroundedScreen() {
     await updatePersonalities(list);
     setShowPersonalityModal(false);
   }
-
   async function deletePersonality(id: string) {
     await updatePersonalities(personalities.filter(p => p.id !== id));
     if (settings.personality === personalities.find(p => p.id === id)?.text) {
-      const updated = { ...settings, personality: '' };
-      await updateSettings(updated);
+      await updateSettings({ ...settings, personality: '' });
     }
     setShowPersonalityModal(false);
   }
 
-  // ── render ──────────────────────────────────────────────────────────────
+  // ── render ────────────────────────────────────────────────────────────────
   return (
-    <View style={[styles.root, { backgroundColor: th.bg }]}>
-      <StatusBar style={dark ? 'light' : 'dark'} />
-      <Orbs dark={dark} />
-
+    <View style={styles.root}>
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+
         {/* Nav */}
         <View style={styles.nav}>
-          <TouchableOpacity
-            style={[styles.navBtn, { backgroundColor: dark ? 'rgba(255,140,50,0.10)' : 'rgba(255,255,255,0.65)', borderColor: dark ? 'rgba(255,140,50,0.22)' : 'rgba(200,100,40,0.18)' }]}
-            onPress={() => setShowLibrary(true)}
-          >
-            <Text style={[styles.navBtnText, { color: dark ? 'rgba(255,210,160,0.65)' : 'rgba(28,10,4,0.52)' }]}>Library</Text>
-          </TouchableOpacity>
-
-          <View style={styles.navRight}>
-            <TouchableOpacity
-              style={[styles.navBtnSquare, { backgroundColor: dark ? 'rgba(255,140,50,0.10)' : 'rgba(255,255,255,0.65)', borderColor: dark ? 'rgba(255,140,50,0.22)' : 'rgba(200,100,40,0.18)' }]}
-              onPress={toggleTheme}
-            >
-              <Text style={{ fontSize: 18 }}>{dark ? '☀︎' : '☽'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.navBtn, { backgroundColor: dark ? 'rgba(255,140,50,0.10)' : 'rgba(255,255,255,0.65)', borderColor: dark ? 'rgba(255,140,50,0.22)' : 'rgba(200,100,40,0.18)' }]}
-              onPress={() => setShowSettings(true)}
-            >
-              <Text style={[styles.navBtnText, { color: dark ? 'rgba(255,210,160,0.65)' : 'rgba(28,10,4,0.52)' }]}>Settings</Text>
-            </TouchableOpacity>
-          </View>
+          <GlassButton label="Library" onPress={() => setShowLibrary(true)} />
+          <GlassButton label="Settings" onPress={() => setShowSettings(true)} />
         </View>
 
         {/* Error */}
@@ -430,238 +330,154 @@ export default function GroundedScreen() {
           </View>
         )}
 
-        {/* ── HOME VIEW ──────────────────────────────────────────────────── */}
+        {/* ── HOME ─────────────────────────────────────────────────────────── */}
         {view === 'home' && (
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          >
-            {/* Title */}
-            <View style={styles.titleWrap}>
-              <Text style={[styles.appTitle, { color: th.text }]}>Grounded</Text>
-              <Text style={[styles.appSubtitle, { color: th.textMuted }]}>
-                What do you need today?
-              </Text>
-            </View>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <ScrollView
+              contentContainerStyle={styles.homeScroll}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Greeting */}
+              <Text style={styles.greeting}>Grounded</Text>
+              <Text style={styles.greetingSub}>What do you need today?</Text>
 
-            {/* Input area pinned to bottom */}
-            <View style={{ flex: 1 }} />
-            <View style={[styles.inputArea, { backgroundColor: dark ? 'transparent' : 'transparent' }]}>
-              {/* Suggestions */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.suggestionsScroll}
-                contentContainerStyle={styles.suggestionsContent}
-              >
-                {suggestions.map(s => (
-                  <TouchableOpacity
-                    key={s}
-                    style={[styles.chip, { backgroundColor: dark ? 'rgba(255,140,50,0.08)' : 'rgba(255,255,255,0.65)', borderColor: dark ? 'rgba(255,140,50,0.22)' : 'rgba(200,100,40,0.18)' }]}
-                    onPress={() => setRequestText(s)}
-                  >
-                    <Text style={[styles.chipText, { color: dark ? 'rgba(255,210,155,0.72)' : 'rgba(28,10,4,0.52)' }]}>{s}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              {/* Input box */}
+              <View style={styles.inputWrap}>
+                <TextInput
+                  style={styles.input}
+                  value={requestText}
+                  onChangeText={setRequestText}
+                  placeholder="say what's going on…"
+                  placeholderTextColor={colors.inkFaint}
+                  multiline
+                  returnKeyType="done"
+                  blurOnSubmit
+                  onSubmitEditing={begin}
+                />
+                <TouchableOpacity
+                  onPress={begin}
+                  disabled={!requestText.trim()}
+                  style={[styles.sendBtn, requestText.trim() && styles.sendBtnActive]}
+                >
+                  <Text style={[styles.sendArrow, requestText.trim() && { color: colors.warmInk }]}>↑</Text>
+                </TouchableOpacity>
+              </View>
 
               {/* Duration chips */}
-              <View style={styles.durationRow}>
+              <View style={styles.durationsRow}>
                 {DURATIONS.map(d => (
-                  <TouchableOpacity
+                  <GlassButton
                     key={d}
-                    style={[
-                      styles.durationChip,
-                      {
-                        backgroundColor: selectedDuration === d
-                          ? (dark ? 'rgba(255,140,50,0.16)' : 'rgba(210,70,15,0.10)')
-                          : (dark ? 'rgba(255,140,50,0.07)' : 'rgba(255,255,255,0.55)'),
-                        borderColor: selectedDuration === d
-                          ? (dark ? 'rgba(255,140,50,0.48)' : 'rgba(210,70,15,0.42)')
-                          : (dark ? 'rgba(255,140,50,0.18)' : 'rgba(200,100,40,0.16)'),
-                      },
-                    ]}
-                    onPress={() => setSelectedDuration(selectedDuration === d ? null : d)}
-                  >
-                    <Text style={[styles.durationChipText, {
-                      color: selectedDuration === d
-                        ? (dark ? 'rgba(255,200,130,0.95)' : 'rgba(210,70,15,0.92)')
-                        : (dark ? 'rgba(255,210,155,0.58)' : 'rgba(28,10,4,0.48)'),
-                    }]}>{d}</Text>
-                  </TouchableOpacity>
+                    label={`${d} min`}
+                    onPress={() => setSelectedDuration(d)}
+                    active={selectedDuration === d}
+                  />
                 ))}
               </View>
 
-              {/* Textarea */}
-              <TextInput
-                style={[styles.textarea, { backgroundColor: th.inputBg, borderColor: th.inputBorder, color: th.text }]}
-                value={requestText}
-                onChangeText={setRequestText}
-                placeholder="How are you feeling, or what do you need right now?"
-                placeholderTextColor={th.textDim}
-                multiline
-                returnKeyType="done"
-                blurOnSubmit
-                onSubmitEditing={begin}
-              />
-
-              {/* Begin button */}
-              <TouchableOpacity
-                style={[styles.btnBegin, { opacity: requestText.trim() ? 1 : 0.35 }]}
-                onPress={begin}
-                disabled={!requestText.trim()}
-              >
-                <Text style={styles.btnBeginText}>Begin</Text>
-              </TouchableOpacity>
-            </View>
+              {/* Suggestion pills */}
+              <View style={styles.suggestionsWrap}>
+                {suggestions.map(s => (
+                  <GlassButton
+                    key={s}
+                    label={s}
+                    onPress={() => setRequestText(s)}
+                    style={{ alignSelf: 'flex-start' }}
+                  />
+                ))}
+              </View>
+            </ScrollView>
           </KeyboardAvoidingView>
         )}
 
-        {/* ── TEXT VIEW ──────────────────────────────────────────────────── */}
+        {/* ── TEXT (generating + reading) ──────────────────────────────────── */}
         {view === 'text' && (
           <View style={{ flex: 1 }}>
-            {/* Streaming indicator */}
             {isStreaming && (
               <View style={styles.streamingBadge}>
-                <Text style={[styles.streamingText, { color: th.textMuted }]}>✦ Writing your meditation...</Text>
+                <Text style={styles.streamingText}>✦ writing your meditation…</Text>
               </View>
             )}
-
             <ScrollView
               ref={textScrollRef}
               style={{ flex: 1 }}
               contentContainerStyle={styles.textScrollContent}
               showsVerticalScrollIndicator={false}
             >
-              <View style={[styles.textCard, { backgroundColor: th.cardBg, borderColor: th.cardBorder }]}>
-                <Text style={[styles.textBody, { color: dark ? 'rgba(255,225,185,0.78)' : 'rgba(28,10,4,0.75)' }]}>
-                  {displayText || (isStreaming ? '' : '')}
-                </Text>
-              </View>
+              <Text style={styles.textBody}>{displayText}</Text>
             </ScrollView>
-
-            {/* Action buttons */}
             {!isStreaming && (
               <View style={styles.textActions}>
-                <TouchableOpacity
-                  style={[styles.btnSecondary, { backgroundColor: dark ? 'rgba(255,140,50,0.08)' : 'rgba(255,255,255,0.62)', borderColor: dark ? 'rgba(255,140,50,0.20)' : 'rgba(28,10,4,0.12)' }]}
-                  onPress={rewrite}
-                >
-                  <Text style={[styles.btnSecondaryText, { color: th.textMuted }]}>Rewrite</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btnSecondary, { backgroundColor: dark ? 'rgba(255,140,50,0.08)' : 'rgba(255,255,255,0.62)', borderColor: dark ? 'rgba(225,80,12,0.30)' : 'rgba(210,70,15,0.28)', opacity: isSaved ? 0.45 : 1 }]}
+                <GlassButton label="Rewrite" onPress={rewrite} />
+                <GlassButton
+                  label={isSaved ? 'Saved ✓' : 'Save'}
                   onPress={saveMeditation}
-                  disabled={isSaved}
-                >
-                  <Text style={[styles.btnSecondaryText, { color: dark ? 'rgba(255,160,80,0.72)' : 'rgba(210,70,15,0.72)' }]}>
-                    {isSaved ? 'Saved ✓' : 'Save'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btnListen, { opacity: isLoadingAudio ? 0.5 : 1 }]}
+                  active={isSaved}
+                />
+                <PrimaryButton
+                  label={isLoadingAudio ? 'Loading…' : 'Listen'}
                   onPress={speak}
                   disabled={isLoadingAudio}
-                >
-                  <Text style={styles.btnListenText}>
-                    {isLoadingAudio ? 'Loading...' : 'Listen ▶'}
-                  </Text>
-                </TouchableOpacity>
+                />
               </View>
             )}
           </View>
         )}
 
-        {/* ── PLAYER VIEW ────────────────────────────────────────────────── */}
+        {/* ── PLAYER ───────────────────────────────────────────────────────── */}
         {view === 'player' && (
           <View style={styles.playerWrap}>
             <Animated.View style={{ transform: [{ scale: ppScale }] }}>
-              <TouchableOpacity style={styles.btnPP} onPress={togglePlay}>
-                <Text style={styles.btnPPIcon}>{isPlaying ? '⏸' : '▶'}</Text>
-              </TouchableOpacity>
+              <PrimaryButton
+                label={isPlaying ? '⏸' : '▶'}
+                onPress={togglePlay}
+                style={{ width: 80, height: 80, borderRadius: 40 }}
+              />
             </Animated.View>
-
-            <View style={[styles.playerRow, { backgroundColor: dark ? 'rgba(255,140,50,0.08)' : 'rgba(255,255,255,0.70)', borderColor: dark ? 'rgba(255,140,50,0.20)' : 'rgba(200,100,40,0.16)' }]}>
-              <Text style={[styles.playerLabel, { color: th.textMuted }]}>
-                {isDone ? 'Complete' : isPlaying ? 'Playing' : 'Paused'}
-              </Text>
-              <TouchableOpacity
-                style={[styles.btnEnd, { borderColor: dark ? 'rgba(255,140,50,0.18)' : 'rgba(28,10,4,0.12)' }]}
-                onPress={endSession}
-              >
-                <Text style={[styles.btnEndText, { color: th.textMuted }]}>End</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.playerStatus}>
+              {isDone ? 'complete' : isPlaying ? 'playing' : 'paused'}
+            </Text>
+            <GlassButton label="End" onPress={endSession} />
           </View>
         )}
       </SafeAreaView>
 
-      {/* ── OVERLAYS ───────────────────────────────────────────────────────── */}
+      {/* ── Overlays ─────────────────────────────────────────────────────── */}
       <Library
-        visible={showLibrary}
-        dark={dark}
-        library={library}
-        folders={folders}
+        visible={showLibrary} dark={true} library={library} folders={folders}
         onClose={() => setShowLibrary(false)}
-        onPlay={playFromLibrary}
-        onView={viewFromLibrary}
-        onDelete={deleteFromLibrary}
-        onFolder={handleFolder}
-        onAddFolder={addFolder}
-        onDeleteFolder={deleteFolder}
+        onPlay={playFromLibrary} onView={viewFromLibrary}
+        onDelete={(id) => setDeleteTarget(id)} onFolder={(m) => setFolderTarget(m)}
+        onAddFolder={addFolder} onDeleteFolder={deleteFolder}
       />
-
       <Settings
-        visible={showSettings}
-        dark={dark}
-        voices={voices}
-        personalities={personalities}
-        settings={settings}
-        onClose={() => setShowSettings(false)}
-        onSave={updateSettings}
-        onNewPersonality={() => {
-          setEditingPersonality('new');
-          setShowPersonalityModal(true);
-        }}
-        onEditPersonality={(p) => {
-          setEditingPersonality(p);
-          setShowPersonalityModal(true);
-        }}
+        visible={showSettings} dark={true} voices={voices}
+        personalities={personalities} settings={settings}
+        onClose={() => setShowSettings(false)} onSave={updateSettings}
+        onNewPersonality={() => { setEditingPersonality('new'); setShowPersonalityModal(true); }}
+        onEditPersonality={(p) => { setEditingPersonality(p); setShowPersonalityModal(true); }}
       />
-
       <DeleteModal
-        visible={deleteTarget !== null}
-        dark={dark}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={confirmDelete}
+        visible={deleteTarget !== null} dark={true}
+        onCancel={() => setDeleteTarget(null)} onConfirm={confirmDelete}
       />
-
       <PersonalityModal
-        visible={showPersonalityModal}
-        dark={dark}
+        visible={showPersonalityModal} dark={true}
         editing={editingPersonality === 'new' ? null : editingPersonality}
         onClose={() => setShowPersonalityModal(false)}
-        onSave={savePersonality}
-        onDelete={deletePersonality}
+        onSave={savePersonality} onDelete={deletePersonality}
       />
-
       <FolderPickerModal
-        visible={folderTarget !== null}
-        dark={dark}
-        meditation={folderTarget}
-        folders={folders}
-        onClose={() => setFolderTarget(null)}
-        onToggleFolder={toggleFolder}
+        visible={folderTarget !== null} dark={true}
+        meditation={folderTarget} folders={folders}
+        onClose={() => setFolderTarget(null)} onToggleFolder={toggleFolder}
       />
-
       {showIntro && (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <IntroOverlay
-            dark={dark}
-            onFinish={async () => {
-              setShowIntro(false);
-              await storage.setHasVisited();
-            }}
+            dark={true}
+            onFinish={async () => { setShowIntro(false); await storage.setHasVisited(); }}
           />
         </View>
       )}
@@ -670,236 +486,94 @@ export default function GroundedScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
+  root: { flex: 1 },
+
   nav: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: space.screenX,
     paddingTop: 8,
     paddingBottom: 4,
   },
-  navRight: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  navBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 100,
-    borderWidth: 1,
-  },
-  navBtnText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  navBtnSquare: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
   errorBanner: {
-    marginHorizontal: 20,
+    marginHorizontal: space.screenX,
     marginTop: 8,
-    backgroundColor: 'rgba(200,40,20,0.10)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(200,40,20,0.12)',
+    borderRadius: radius.m,
     padding: 12,
   },
-  errorText: {
-    color: 'rgba(200,40,20,0.85)',
-    fontSize: 14,
-    textAlign: 'center',
-  },
+  errorText: { color: 'rgba(255,120,100,0.90)', fontSize: 14, textAlign: 'center' },
 
   // ── Home ──
-  titleWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
+  homeScroll: {
+    padding: space.screenX,
+    paddingTop: 60,
+    gap: space.m,
   },
-  appTitle: {
-    fontSize: 44,
-    fontWeight: '300',
-    letterSpacing: -1,
-    marginBottom: 8,
-    fontFamily: 'Nunito_300Light',
+  greeting: {
+    fontFamily: familyForWeight('200'),
+    fontSize: 38, fontWeight: '200',
+    letterSpacing: -0.8, lineHeight: 42,
+    color: colors.ink,
+    textAlign: 'center',
+    marginBottom: 4,
   },
-  appSubtitle: {
-    fontSize: 16,
-    letterSpacing: 0.2,
+  greetingSub: {
+    fontFamily: familyForWeight('300'),
+    fontSize: 14.5, color: colors.inkMute,
+    textAlign: 'center', marginBottom: space.m,
   },
-  inputArea: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    gap: 12,
+  inputWrap: {
+    backgroundColor: colors.surface,
+    borderColor: colors.hairline, borderWidth: 1,
+    borderRadius: radius.l,
+    minHeight: 80, padding: 16, paddingRight: 56,
   },
-  suggestionsScroll: {
-    flexGrow: 0,
+  input: {
+    fontFamily: familyForWeight('300'),
+    fontSize: 15, color: colors.ink, lineHeight: 22, minHeight: 48,
   },
-  suggestionsContent: {
-    gap: 8,
-    paddingRight: 4,
+  sendBtn: {
+    position: 'absolute', right: 8, bottom: 8,
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: colors.surface,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.hairline,
   },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 100,
-    borderWidth: 1,
+  sendBtnActive: {
+    backgroundColor: 'rgba(20,16,38,0.65)',
+    borderColor: colors.warmBorder,
   },
-  chipText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  durationRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  durationChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 100,
-    borderWidth: 1,
-  },
-  durationChipText: {
-    fontSize: 13,
-  },
-  textarea: {
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 18,
-    fontSize: 16,
-    lineHeight: 24,
-    minHeight: 90,
-    textAlignVertical: 'top',
-  },
-  btnBegin: {
-    backgroundColor: 'rgba(210,70,15,0.92)',
-    paddingVertical: 18,
-    borderRadius: 100,
-    alignItems: 'center',
-    shadowColor: 'rgba(200,60,10,1)',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.32,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  btnBeginText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
+  sendArrow: { color: colors.inkMute, fontSize: 16 },
+  durationsRow: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
+  suggestionsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
   // ── Text view ──
-  streamingBadge: {
-    alignSelf: 'center',
-    marginVertical: 12,
-  },
+  streamingBadge: { alignSelf: 'center', marginVertical: 12 },
   streamingText: {
-    fontSize: 14,
-    letterSpacing: 0.3,
+    fontFamily: familyForWeight('300'),
+    fontSize: 13, color: colors.inkMute, letterSpacing: 0.4,
   },
-  textScrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  textCard: {
-    borderWidth: 1,
-    borderRadius: 24,
-    padding: 28,
-  },
+  textScrollContent: { padding: space.screenX, paddingBottom: 40 },
   textBody: {
-    fontSize: 16,
-    lineHeight: 30,
-    fontFamily: 'Nunito_400Regular',
-    letterSpacing: 0.01,
+    fontFamily: familyForWeight('300'),
+    fontSize: 16, lineHeight: 30,
+    color: colors.inkSoft, letterSpacing: 0.05,
   },
   textActions: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 8,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  btnSecondary: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 100,
-    borderWidth: 1,
-  },
-  btnSecondaryText: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  btnListen: {
-    backgroundColor: 'rgba(210,70,15,0.92)',
-    paddingVertical: 16,
-    paddingHorizontal: 36,
-    borderRadius: 100,
-    shadowColor: 'rgba(200,60,10,1)',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.32,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  btnListenText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    flexDirection: 'row', gap: 10,
+    paddingHorizontal: space.screenX,
+    paddingBottom: 20, paddingTop: 8,
+    flexWrap: 'wrap', justifyContent: 'center',
   },
 
   // ── Player ──
   playerWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 24,
+    flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.l,
   },
-  btnPP: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(210,70,15,0.92)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: 'rgba(200,60,10,1)',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
-    elevation: 10,
-  },
-  btnPPIcon: {
-    color: '#fff',
-    fontSize: 26,
-  },
-  playerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 100,
-    borderWidth: 1,
-  },
-  playerLabel: {
-    fontSize: 13,
-    letterSpacing: 0.2,
-  },
-  btnEnd: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 100,
-    borderWidth: 1,
-  },
-  btnEndText: {
-    fontSize: 12,
+  playerStatus: {
+    fontFamily: familyForWeight('300'),
+    fontSize: 13, color: colors.inkMute, letterSpacing: 0.4,
   },
 });
